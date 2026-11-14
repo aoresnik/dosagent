@@ -1,0 +1,7 @@
+/build/
+test/qemu/dl/
+test/qemu/*.img
+test/qemu/monitor.sock
+test/qemu/qemu.log
+test/qemu/*.CFG
+/third_party/

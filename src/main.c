@@ -1,0 +1,559 @@
+/* DOSAGENT - an agentic LLM harness for MS-DOS. */
+#include "api.h"
+#include "buf.h"
+#include "charset.h"
+#include "json.h"
+#include "net.h"
+#include "platform.h"
+#include "tools.h"
+
+#include <ctype.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#ifndef PATH_MAX
+#define PATH_MAX 260
+#endif
+
+#define VERSION "0.1"
+
+typedef struct {
+    char api_key[160];
+    char host[128];
+    char path[64];
+    int port;
+    int tls;
+    char cacert[PATH_MAX];
+    char model[64];
+    char effort[16];
+    long max_tokens;
+    int thinking;
+    int show_thinking;
+    int fallbacks;
+    int cache;
+    int confirm;
+    long max_output;
+    char tls_date[16];
+    char temp_dir[PATH_MAX];
+    char seed_file[PATH_MAX];
+} config_t;
+
+static config_t cfg;
+
+static void config_defaults(void)
+{
+    memset(&cfg, 0, sizeof cfg);
+    snprintf(cfg.host, sizeof cfg.host, "api.anthropic.com");
+    snprintf(cfg.path, sizeof cfg.path, "/v1/messages");
+    cfg.port = 443;
+    cfg.tls = 1;
+    snprintf(cfg.cacert, sizeof cfg.cacert, "CACERT.PEM");
+    snprintf(cfg.model, sizeof cfg.model, "claude-opus-5-5");
+    snprintf(cfg.effort, sizeof cfg.effort, "medium");
+    cfg.max_tokens = 32000;
+    cfg.thinking = 1;
+    cfg.fallbacks = 1;
+    cfg.cache = 1;
+    cfg.confirm = 1;
+    cfg.max_output = 16000;
+    snprintf(cfg.seed_file, sizeof cfg.seed_file, "RANDSEED.BIN");
+}
+
+static char *trim(char *s)
+{
+    char *e;
+    while (isspace((unsigned char)*s))
+        s++;
+    e = s + strlen(s);
+    while (e > s && isspace((unsigned char)e[-1]))
+        *--e = 0;
+    return s;
+}
+
+#define SETSTR(field) snprintf(cfg.field, sizeof cfg.field, "%s", val)
+
+static void config_set(const char *key, const char *val)
+{
+    if (strcmp(key, "api_key") == 0) SETSTR(api_key);
+    else if (strcmp(key, "host") == 0) SETSTR(host);
+    else if (strcmp(key, "path") == 0) SETSTR(path);
+    else if (strcmp(key, "port") == 0) cfg.port = atoi(val);
+    else if (strcmp(key, "tls") == 0) cfg.tls = atoi(val);
+    else if (strcmp(key, "cacert") == 0) SETSTR(cacert);
+    else if (strcmp(key, "model") == 0) SETSTR(model);
+    else if (strcmp(key, "effort") == 0) SETSTR(effort);
+    else if (strcmp(key, "max_tokens") == 0) cfg.max_tokens = atol(val);
+    else if (strcmp(key, "thinking") == 0) cfg.thinking = atoi(val);
+    else if (strcmp(key, "show_thinking") == 0) cfg.show_thinking = atoi(val);
+    else if (strcmp(key, "fallbacks") == 0) cfg.fallbacks = atoi(val);
+    else if (strcmp(key, "cache") == 0) cfg.cache = atoi(val);
+    else if (strcmp(key, "confirm") == 0) cfg.confirm = atoi(val);
+    else if (strcmp(key, "max_output") == 0) cfg.max_output = atol(val);
+    else if (strcmp(key, "tls_date") == 0) SETSTR(tls_date);
+    else if (strcmp(key, "temp_dir") == 0) SETSTR(temp_dir);
+    else if (strcmp(key, "seed_file") == 0) SETSTR(seed_file);
+    else if (strcmp(key, "charset") == 0) charset_cp437 = strcmp(val, "cp437") == 0;
+    else fprintf(stderr, "warning: unknown config key '%s'\n", key);
+}
+
+static int config_load(const char *path)
+{
+    char line[512];
+    FILE *f = fopen(path, "r");
+    if (!f)
+        return -1;
+    while (fgets(line, sizeof line, f)) {
+        char *s = trim(line), *eq;
+        if (!*s || *s == '#' || *s == ';')
+            continue;
+        eq = strchr(s, '=');
+        if (!eq)
+            continue;
+        *eq = 0;
+        config_set(trim(s), trim(eq + 1));
+    }
+    fclose(f);
+    return 0;
+}
+
+/* Path of a file next to the executable. */
+static void exe_relative(char *out, size_t n, const char *argv0,
+                         const char *name)
+{
+    const char *slash = NULL, *p;
+    for (p = argv0; *p; p++)
+        if (*p == '/' || *p == '\\')
+            slash = p;
+    if (!slash)
+        snprintf(out, n, "%s", name);
+    else
+        snprintf(out, n, "%.*s%s", (int)(slash - argv0 + 1), argv0, name);
+}
+
+/* Resolve a configured file name: as given if it exists, else next to the
+ * executable. */
+static void resolve_file(char *field, size_t n, const char *argv0)
+{
+    char alt[PATH_MAX];
+    FILE *f;
+    if (!field[0] || (f = fopen(field, "rb")) != NULL) {
+        if (field[0])
+            fclose(f);
+        return;
+    }
+    exe_relative(alt, sizeof alt, argv0, field);
+    snprintf(field, n, "%s", alt);
+}
+
+/* "YYYY-MM-DD" -> days since 0000-01-01, BearSSL's convention
+ * (1970-01-01 is day 719528). Uses the days-from-civil algorithm. */
+static long parse_date_days(const char *s)
+{
+    int y, m, d;
+    long era, yoe, doy, doe;
+    if (sscanf(s, "%d-%d-%d", &y, &m, &d) != 3 || m < 1 || m > 12 ||
+        d < 1 || d > 31)
+        return 0;
+    y -= m <= 2;
+    era = (y >= 0 ? y : y - 399) / 400;
+    yoe = y - era * 400;
+    doy = (153L * (m + (m > 2 ? -3 : 9)) + 2) / 5 + d - 1;
+    doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    return era * 146097L + doe - 719468L + 719528L;
+}
+
+/* ------------------------------------------------------------ prompt */
+
+static void build_system_prompt(buf_t *sp)
+{
+    char cwd[PATH_MAX];
+    buf_t os;
+
+    buf_init(&os);
+    plat_describe(&os);
+    if (!plat_getcwd(cwd, sizeof cwd))
+        snprintf(cwd, sizeof cwd, "?");
+
+    buf_puts(sp,
+        "You are an AI agent running in DOSAGENT, a small agentic harness for "
+        "MS-DOS PCs. You help the user by running commands and reading and "
+        "editing files on their machine through the tools provided.\n\n");
+    buf_puts(sp, "Machine: ");
+    local_to_utf8(sp, os.p, os.len);
+    buf_puts(sp, "\nCurrent directory at start: ");
+    local_to_utf8(sp, cwd, strlen(cwd));
+    buf_puts(sp, "\n\n");
+#if PLAT_DOS
+    buf_puts(sp,
+        "About this environment:\n"
+        "- The user reads your replies on an 80x25 text console with no "
+        "Markdown rendering. Write plain text with short lines; no tables, "
+        "headings or emoji. Stick to characters in code page 437.\n"
+        "- DOS is single-tasking with no memory protection. A program that "
+        "waits for keyboard input, hangs, or crashes freezes the whole "
+        "machine until the user reboots, and there is no timeout. Do not "
+        "start interactive programs, TSRs, or programs that switch video "
+        "modes unless the user asks.\n"
+        "- File names are 8.3, upper case, no spaces; paths use backslashes. "
+        "COMMAND.COM cannot redirect stderr and has no && or ||; use a batch "
+        "file for multi-step sequences.\n"
+        "- The machine may be as slow as a 386 with a few MB of RAM. Avoid "
+        "commands with huge output (such as DIR /S on a whole drive); narrow "
+        "them with paths and wildcards.\n"
+        "- Prefer read_file, edit_file and write_file over shell commands for "
+        "text files. Files use CRLF on disk; the tools convert to and from LF "
+        "for you.\n"
+        "- The user approves each command and file change and may decline. "
+        "If they decline, ask what they want instead.\n");
+#else
+    buf_puts(sp,
+        "About this environment:\n"
+        "- This is the POSIX host test build of the DOS harness. Commands run "
+        "via /bin/sh. Replies are shown on a plain text terminal: write plain "
+        "text with short lines, no Markdown.\n"
+        "- The user approves each command and file change and may decline.\n");
+#endif
+    buf_free(&os);
+}
+
+/* ------------------------------------------------------------ agent loop */
+
+static api_cfg acfg;
+static char *system_prompt;
+
+static void print_usage(const api_result *r)
+{
+    printf("[%s  in:%ld", r->model[0] ? r->model : cfg.model, r->in_tok);
+    if (r->cache_read)
+        printf(" cached:%ld", r->cache_read);
+    if (r->cache_write)
+        printf(" cache+:%ld", r->cache_write);
+    printf(" out:%ld]\n", r->out_tok);
+}
+
+/* Ask whether to run a tool call. Returns 1 to run, 0 to deny; *reason
+ * gets an optional explanation for a denial. */
+static int confirm_tool(char *reason, size_t n)
+{
+    reason[0] = 0;
+    for (;;) {
+        int k;
+        printf("Allow? [Y]es / [N]o / [A]lways > ");
+        fflush(stdout);
+        k = plat_getkey();
+        if (k < 0)
+            return 0;
+        k = toupper(k);
+#if PLAT_DOS
+        if (k == 'Y' || k == 'N' || k == 'A' || k == '\r' || k == 27)
+            printf("%c\n", k == '\r' ? 'Y' : (k == 27 ? 'N' : k));
+#endif
+        if (k == 'Y' || k == '\r' || k == '\n')
+            return 1;
+        if (k == 'A') {
+            cfg.confirm = 0;
+            printf("(Auto-approving from now on; /confirm turns prompts back "
+                   "on.)\n");
+            return 1;
+        }
+        if (k == 'N' || k == 27) {
+            printf("Reason (optional): ");
+            fflush(stdout);
+            if (plat_read_line(reason, n) < 0)
+                reason[0] = 0;
+            return 0;
+        }
+    }
+}
+
+static void add_tool_result(conv_t *conv, const char *id, const char *text,
+                            size_t len, int is_error)
+{
+    buf_t b;
+    buf_init(&b);
+    buf_puts(&b, "{\"type\":\"tool_result\",\"tool_use_id\":");
+    json_put_cstr(&b, id);
+    buf_puts(&b, ",\"content\":");
+    json_put_str(&b, len ? text : "(empty)", len ? len : 7);
+    if (is_error)
+        buf_puts(&b, ",\"is_error\":true");
+    buf_putc(&b, '}');
+    conv_append(conv, "user", b.p);
+    buf_free(&b);
+}
+
+/* Runs model turns until the model stops asking for tools. */
+static void agent_turn(conv_t *conv)
+{
+    for (;;) {
+        api_result res;
+        size_t i;
+        int ran_tools = 0, aborted = 0, paused;
+
+        memset(&res, 0, sizeof res);
+        plat_clear_abort();
+        printf("\n");
+        if (api_send(&acfg, system_prompt, tools_json(), conv, &res) != API_OK)
+            return;
+        print_usage(&res);
+        paused = strcmp(res.stop_reason, "pause_turn") == 0;
+
+        if (strcmp(res.stop_reason, "refusal") == 0) {
+            /* Partial output from a declined turn is discarded, not kept. */
+            printf("[The model declined this request.]\n");
+            api_result_free(&res);
+            return;
+        }
+
+        /* Drop a truncated tool call (max_tokens hit mid-input). */
+        while (res.n > 0 && strcmp(res.b[res.n - 1].type, "tool_use") == 0 &&
+               !res.b[res.n - 1].input) {
+            printf("[Incomplete tool call dropped: output limit reached.]\n");
+            free(res.b[res.n - 1].type);
+            free(res.b[res.n - 1].json);
+            free(res.b[res.n - 1].id);
+            free(res.b[res.n - 1].name);
+            res.n--;
+        }
+        for (i = 0; i < res.n; i++)
+            conv_append(conv, "assistant", res.b[i].json);
+
+        for (i = 0; i < res.n; i++) {
+            block_t *b = &res.b[i];
+            buf_t desc, result;
+            int is_error, allowed = 1;
+            char reason[256];
+
+            if (strcmp(b->type, "tool_use") != 0)
+                continue;
+            ran_tools = 1;
+            buf_init(&desc);
+            buf_init(&result);
+            tool_describe(b->name, b->input, &desc);
+            printf("> %s", desc.p ? desc.p : "\n");
+            if (aborted) {
+                buf_puts(&result, "Not run: the user interrupted.");
+                is_error = 1;
+            } else {
+                if (cfg.confirm && tool_needs_confirm(b->name))
+                    allowed = confirm_tool(reason, sizeof reason);
+                if (!allowed) {
+                    buf_puts(&result, "The user declined this action.");
+                    if (reason[0]) {
+                        buf_puts(&result, " Their reason: ");
+                        local_to_utf8(&result, reason, strlen(reason));
+                    }
+                    is_error = 1;
+                } else {
+                    /* A long-running command would let the idle keep-alive
+                     * connection go stale anyway. */
+                    if (strcmp(b->name, "run_command") == 0)
+                        http_disconnect();
+                    is_error = tool_run(b->name, b->input, &result);
+                    if (is_error) {
+                        printf("  ! ");
+                        print_utf8(result.p, result.len > 200 ? 200 : result.len);
+                        printf("\n");
+                    }
+                }
+                if (plat_poll_abort())
+                    aborted = 1;
+            }
+            add_tool_result(conv, b->id, result.p ? result.p : "", result.len,
+                            is_error);
+            buf_free(&desc);
+            buf_free(&result);
+        }
+        api_result_free(&res);
+
+        if (aborted) {
+            printf("[Interrupted; tell the model what to do next.]\n");
+            return;
+        }
+        /* Tool results (or pause_turn) need another model turn. */
+        if (!ran_tools && !paused)
+            return;
+    }
+}
+
+/* ------------------------------------------------------------ main */
+
+static void print_help(void)
+{
+    printf("Type a request and press Enter. End a line with \\ to continue it.\n"
+           "Esc or Ctrl-C interrupts the model.\n"
+           "Commands:\n"
+           "  /help            this text\n"
+           "  /clear           start a new conversation\n"
+           "  /confirm         toggle approval prompts (now %s)\n"
+           "  /model NAME      switch model (now %s)\n"
+           "  /effort LEVEL    low, medium, high, xhigh, max (now %s)\n"
+           "  /quit            exit\n",
+           cfg.confirm ? "on" : "off", cfg.model,
+           cfg.effort[0] ? cfg.effort : "default");
+}
+
+static void apply_model_settings(void)
+{
+    acfg.model = cfg.model;
+    acfg.effort = cfg.effort;
+    /* Server-side fallbacks are not offered for Haiku models. */
+    acfg.fallbacks = cfg.fallbacks && !strstr(cfg.model, "haiku");
+}
+
+int main(int argc, char **argv)
+{
+    char cfg_path[PATH_MAX] = "";
+    char line[2048];
+    buf_t input;
+    conv_t conv;
+    const char *env;
+    int i, first_prompt_from_args = 0;
+    buf_t sp;
+    long days;
+
+    config_defaults();
+    charset_cp437 = PLAT_DOS;
+    for (i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-c") == 0 && i + 1 < argc)
+            snprintf(cfg_path, sizeof cfg_path, "%s", argv[++i]);
+        else
+            break;
+    }
+    if (cfg_path[0]) {
+        if (config_load(cfg_path) < 0)
+            die("cannot read config %s", cfg_path);
+    } else if (config_load("AGENT.CFG") < 0) {
+        exe_relative(cfg_path, sizeof cfg_path, argv[0], "AGENT.CFG");
+        config_load(cfg_path);
+    }
+    if ((env = getenv("ANTHROPIC_API_KEY")) != NULL && env[0])
+        snprintf(cfg.api_key, sizeof cfg.api_key, "%s", env);
+
+    printf("DOSAGENT %s - agentic LLM harness for DOS\n", VERSION);
+    plat_init();
+    resolve_file(cfg.seed_file, sizeof cfg.seed_file, argv[0]);
+    tls_load_seed(cfg.seed_file);
+    plat_entropy();
+
+    if (!cfg.api_key[0])
+        printf("warning: no api_key in AGENT.CFG or ANTHROPIC_API_KEY.\n");
+    if (cfg.tls) {
+        int n;
+        resolve_file(cfg.cacert, sizeof cfg.cacert, argv[0]);
+        n = tls_load_ca_file(cfg.cacert);
+        if (n <= 0)
+            die("cannot load CA certificates from %s", cfg.cacert);
+        printf("Loaded %d CA certificates.\n", n);
+        if (cfg.tls_date[0]) {
+            days = parse_date_days(cfg.tls_date);
+            if (days <= 0)
+                die("bad tls_date '%s' (use YYYY-MM-DD)", cfg.tls_date);
+            tls_set_fixed_date(days);
+        }
+    }
+    if (net_init() < 0)
+        return 1;
+
+    tools_init(cfg.temp_dir, cfg.max_output);
+    buf_init(&sp);
+    build_system_prompt(&sp);
+    system_prompt = sp.p;
+
+    acfg.target.host = cfg.host;
+    acfg.target.port = cfg.port;
+    acfg.target.tls = cfg.tls;
+    acfg.path = cfg.path;
+    acfg.api_key = cfg.api_key;
+    acfg.max_tokens = cfg.max_tokens;
+    acfg.thinking = cfg.thinking;
+    acfg.show_thinking = cfg.show_thinking;
+    acfg.cache = cfg.cache;
+    apply_model_settings();
+
+    printf("Model %s via %s%s:%d. /help for commands.\n", cfg.model,
+           cfg.tls ? "https://" : "http://", cfg.host, cfg.port);
+
+    conv_init(&conv);
+    buf_init(&input);
+
+    /* Remaining arguments form the first prompt. */
+    if (i < argc) {
+        for (; i < argc; i++) {
+            if (input.len)
+                buf_putc(&input, ' ');
+            buf_puts(&input, argv[i]);
+        }
+        first_prompt_from_args = 1;
+    }
+
+    for (;;) {
+        buf_t utf8;
+        if (!first_prompt_from_args) {
+            buf_clear(&input);
+            printf("\nYou> ");
+            fflush(stdout);
+            for (;;) {
+                int n = plat_read_line(line, sizeof line);
+                if (n < 0)
+                    goto quit;
+                if (n > 0 && line[n - 1] == '\\') {
+                    line[n - 1] = 0;
+                    buf_puts(&input, line);
+                    buf_putc(&input, '\n');
+                    printf("...> ");
+                    fflush(stdout);
+                    continue;
+                }
+                buf_puts(&input, line);
+                break;
+            }
+        }
+        first_prompt_from_args = 0;
+        if (input.len == 0)
+            continue;
+
+        if (input.p[0] == '/') {
+            char *cmd = trim(input.p);
+            char *arg = strchr(cmd, ' ');
+            if (arg)
+                *arg++ = 0, arg = trim(arg);
+            if (strcmp(cmd, "/quit") == 0 || strcmp(cmd, "/exit") == 0)
+                break;
+            else if (strcmp(cmd, "/help") == 0)
+                print_help();
+            else if (strcmp(cmd, "/clear") == 0) {
+                conv_free(&conv);
+                printf("Conversation cleared.\n");
+            } else if (strcmp(cmd, "/confirm") == 0) {
+                cfg.confirm = !cfg.confirm;
+                printf("Approval prompts %s.\n", cfg.confirm ? "on" : "off");
+            } else if (strcmp(cmd, "/model") == 0 && arg && *arg) {
+                snprintf(cfg.model, sizeof cfg.model, "%s", arg);
+                apply_model_settings();
+                printf("Model set to %s.\n", cfg.model);
+            } else if (strcmp(cmd, "/effort") == 0 && arg) {
+                snprintf(cfg.effort, sizeof cfg.effort, "%s", arg);
+                printf("Effort set to %s.\n", cfg.effort[0] ? cfg.effort :
+                       "model default");
+            } else
+                printf("Unknown command. /help lists commands.\n");
+            continue;
+        }
+
+        buf_init(&utf8);
+        local_to_utf8(&utf8, input.p, input.len);
+        conv_add_user_text(&conv, utf8.p);
+        buf_free(&utf8);
+        agent_turn(&conv);
+    }
+quit:
+    http_disconnect();
+    tls_save_seed(cfg.seed_file);
+    conv_free(&conv);
+    buf_free(&input);
+    buf_free(&sp);
+    return 0;
+}

@@ -1,0 +1,48 @@
+# DOSAGENT configuration. Copy to AGENT.CFG next to AGENT.EXE (or in the
+# current directory). Lines are key=value; # starts a comment.
+
+# Required. ANTHROPIC_API_KEY in the environment overrides this.
+api_key=sk-ant-...
+
+# Model and effort (low, medium, high, xhigh, max; empty = model default).
+model=claude-opus-5-5
+effort=medium
+max_tokens=32000
+
+# Adaptive thinking (1/0) and whether to print thinking summaries.
+thinking=1
+show_thinking=0
+
+# Server-side refusal fallbacks (ignored for Haiku models).
+fallbacks=1
+
+# Prompt caching: the whole conversation is resent every turn, so this
+# saves a lot of money on long sessions.
+cache=1
+
+# Ask before running commands and changing files.
+confirm=1
+
+# Bytes of command/file output sent to the model per tool call.
+max_output=16000
+
+# Endpoint. For a TLS-terminating proxy on your LAN: tls=0, host=<proxy IP>,
+# port=<proxy port>. For llama.cpp's llama-server: tls=0, host=<server IP>,
+# port=8080 (see README.md).
+host=api.anthropic.com
+port=443
+path=/v1/messages
+tls=1
+
+# PEM bundle of trusted root CAs (e.g. curl's cacert.pem).
+cacert=CACERT.PEM
+
+# If the machine's clock is wrong, certificate dates are checked against
+# this date instead (YYYY-MM-DD). Leave empty to use the clock.
+tls_date=
+
+# Where command output is captured (default: current directory at start).
+temp_dir=C:\TEMP
+
+# Entropy carried across runs for the TLS random generator.
+seed_file=RANDSEED.BIN
