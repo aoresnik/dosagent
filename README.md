@@ -1,13 +1,25 @@
 # DOSAGENT
 
-An agentic LLM harness for MS-DOS: you type a request, Claude runs commands
-and reads and edits files on the DOS machine through tools, and you approve
-each action. It talks to the Anthropic Messages API directly over HTTPS:
-packet driver, then Watt-32 TCP/IP, then BearSSL TLS 1.2. No proxy needed.
+An agentic LLM harness for MS-DOS: you type a request, Claude (or a local
+model server) runs commands and reads and edits files on the DOS machine
+through tools, and you approve each action. It talks to the Anthropic
+Messages API directly over HTTP(S): packet driver, then Watt-32 TCP/IP,
+then BearSSL TLS 1.2. No proxy needed.
 
 Target: 386 or better, 4 MB RAM, DOS 5+ (or FreeDOS), a packet driver.
 Built with DJGPP, so it runs in 32-bit protected mode under CWSDPMI and
 leaves almost all conventional memory free for the programs it runs.
+
+**WARNING: NOT INTENDED TO BE USED AS A PRODUCTION SOLUTION, JUST AS A
+CURIOSITY**
+
+Risks:
+- Not suitable for serious software development. DOS doesn't have robust
+  multitasking and memory protections, so the bugs in the program under
+  development may hang the machine or corrupt memory and disk.
+- DOS always runs in administrator mode and doesn't have sandboxing support.
+  Check any command before letting the agent run it.
+- The agent may contain bugs.
 
 ## Layout
 
