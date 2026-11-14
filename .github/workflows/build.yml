@@ -25,7 +25,8 @@ jobs:
           fetch-depth: 0  # tags, for the version
 
       - name: Install build tools
-        run: sudo apt-get update && sudo apt-get install -y nasm zip
+        # libfl2: the DJGPP binutils need the flex runtime library.
+        run: sudo apt-get update && sudo apt-get install -y nasm zip libfl2
 
       - name: Install DJGPP
         run: |
