@@ -2,6 +2,7 @@
 #include "charset.h"
 #include "net.h"
 #include "platform.h"
+#include "version.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -476,7 +477,7 @@ int api_send(const api_cfg *cfg, const char *system, const char *tools_json,
 
     buf_puts(&headers, "Content-Type: application/json\r\n"
                        "Accept: text/event-stream\r\n"
-                       "User-Agent: dosagent/0.1\r\n"
+                       "User-Agent: dosagent/" VERSION "\r\n"
                        "anthropic-version: 2023-06-01\r\n");
     if (cfg->api_key && cfg->api_key[0])
         buf_printf(&headers, "x-api-key: %s\r\n", cfg->api_key);

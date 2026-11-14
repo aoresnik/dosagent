@@ -3,8 +3,8 @@
 #   boot.img  FreeDOS 1.4 boot floppy, set up to skip the installer, load the
 #             NE2000 packet driver and switch to C:
 #   hdd.img   FAT16 hard disk with CWSDPMI, mTCP tools, configs, the CA
-#             bundle and AGENT.EXE (if built)
-# Re-run after rebuilding AGENT.EXE (only hdd.img is refreshed then).
+#             bundle and DOSAGENT.EXE (if built)
+# Re-run after rebuilding DOSAGENT.EXE (only hdd.img is refreshed then).
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/../.." && pwd)
@@ -72,12 +72,12 @@ mcopy -o -i "$IMG" mtcp.tmp ::NET/MTCP.CFG
 rm -f wattcp.tmp mtcp.tmp
 
 # Agent files.
-if [ -f "$ROOT/build/dos/AGENT.EXE" ]; then
-    mcopy -o -i "$IMG" "$ROOT/build/dos/AGENT.EXE" ::AGENT/
+if [ -f "$ROOT/build/dos/DOSAGENT.EXE" ]; then
+    mcopy -o -i "$IMG" "$ROOT/build/dos/DOSAGENT.EXE" ::AGENT/
 fi
 CA=${CACERT:-/etc/ssl/certs/ca-certificates.crt}
 mcopy -o -i "$IMG" "$CA" ::AGENT/CACERT.PEM
-# Every *.CFG here (AGENT.CFG, LLAMA.CFG, ...) goes to C:\AGENT with CRLFs.
+# Every *.CFG here (DOSAGENT.CFG, LLAMA.CFG, ...) goes to C:\AGENT with CRLFs.
 for cfg in "$HERE"/*.CFG; do
     [ -f "$cfg" ] || continue
     sed 's/$/\r/' "$cfg" > agentcfg.tmp

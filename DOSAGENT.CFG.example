@@ -1,5 +1,5 @@
-# DOSAGENT configuration. Copy to AGENT.CFG next to AGENT.EXE (or in the
-# current directory). Lines are key=value; # starts a comment.
+# DOSAGENT configuration, read from DOSAGENT.CFG in the current directory
+# or next to DOSAGENT.EXE. Lines are key=value; # starts a comment.
 
 # Required. ANTHROPIC_API_KEY in the environment overrides this.
 api_key=sk-ant-...

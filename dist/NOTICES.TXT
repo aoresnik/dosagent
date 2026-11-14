@@ -1,0 +1,29 @@
+Third-party software in this package
+====================================
+
+DOSAGENT: https://github.com/aoresnik/dosagent
+DOSAGENT itself is licensed under the Apache License 2.0 (LICENSE.TXT).
+
+DOSAGENT.EXE was built with DJGPP (https://www.delorie.com/djgpp/) and
+contains code from BearSSL and Watt-32, whose notices follow.
+
+
+CWSDPMI
+-------
+
+CWSDPMI.EXE is the unmodified DPMI server from csdpmi7b.zip, Copyright (C)
+1995-2010 Charles W Sandmann. See CWSDPMI.DOC for its terms.
+
+You have the right to receive the source code and binary updates for
+CWSDPMI. The source is csdpmi7s.zip, available from
+http://sandmann.dotster.com/cwsdpmi/ and
+https://www.delorie.com/pub/djgpp/current/v2misc/
+
+
+Watt-32
+-------
+
+Watt-32 TCP/IP: https://github.com/gvanem/Watt-32
+Based on Waterloo TCP, Copyright (c) 1990-1993 Erick Engelke.
+Portions are covered by the following notice:
+

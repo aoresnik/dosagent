@@ -1,0 +1,54 @@
+# Builds the DOS release archive (make dist) on every push and pull
+# request. A pushed v* tag also publishes it as a GitHub release.
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  dist:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write  # for creating releases
+    env:
+      # The same toolchain as used in development (see DEVELOPMENT.md).
+      DJGPP_URL: https://github.com/andrewwutw/build-djgpp/releases/download/v3.4/djgpp-linux64-gcc1220.tar.bz2
+      DJGPP_SHA256: 8464f17017d6ab1b2bb2df4ed82357b5bf692e6e2b7fee37e315638f3d505f00
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 0  # tags, for the version
+
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y nasm zip
+
+      - name: Install DJGPP
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/djgpp.tar.bz2" "$DJGPP_URL"
+          echo "$DJGPP_SHA256  $RUNNER_TEMP/djgpp.tar.bz2" | sha256sum -c
+          sudo tar -xjf "$RUNNER_TEMP/djgpp.tar.bz2" -C /opt
+          echo /opt/djgpp/bin >> "$GITHUB_PATH"
+
+      - name: Build
+        run: make -j"$(nproc)" dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dosagent-${{ github.sha }}
+          path: build/dist/*.ZIP
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(sh tools/version.sh | cut -d' ' -f1)
+          prerelease=
+          case $version in *[a-z]) prerelease=--prerelease ;; esac
+          gh release create "$GITHUB_REF_NAME" build/dist/*.ZIP \
+              --title "DOSAGENT $version" --generate-notes $prerelease

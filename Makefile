@@ -1,7 +1,8 @@
 # DOSAGENT build.
 #
 #   make host    Linux/POSIX test build -> build/host/agent
-#   make dos     DJGPP cross build      -> build/dos/AGENT.EXE
+#   make dos     DJGPP cross build      -> build/dos/DOSAGENT.EXE
+#   make dist    release archive        -> build/dist/DAGNTxyq.ZIP
 #
 # For the DOS build, set DJGPP_PREFIX to your cross-compiler prefix. Watt-32
 # is compiled from its sources here, without its configur.sh; the errno files
@@ -17,9 +18,23 @@ BEARSSL_SRCS := $(shell find $(BEARSSL)/src -name '*.c')
 
 WARN := -Wall -Wextra -Wno-unused-parameter
 
+# Version and archive name from the git tag (see tools/version.sh).
+# make dist TAG=v0.1a builds as if HEAD had that tag.
+VERSION_INFO := $(shell sh tools/version.sh $(TAG))
+ifeq ($(VERSION_INFO),)
+$(error cannot determine the version)
+endif
+VERSION  := $(word 1,$(VERSION_INFO))
+DIST_ZIP := $(word 2,$(VERSION_INFO))
+# build/version.h is rewritten only when the version changes.
+$(shell mkdir -p build && \
+        echo '#define VERSION "$(VERSION)"' > build/version.h.tmp && \
+        { cmp -s build/version.h.tmp build/version.h || \
+          mv build/version.h.tmp build/version.h; } ; rm -f build/version.h.tmp)
+
 # ---------------------------------------------------------------- host
 HOST_CC     ?= gcc
-HOST_CFLAGS := -std=gnu99 -O2 -g $(WARN) -I$(BEARSSL)/inc
+HOST_CFLAGS := -std=gnu99 -O2 -g $(WARN) -Ibuild -I$(BEARSSL)/inc
 HOST_OBJ    := build/host
 HOST_APP_OBJS := $(SRCS:src/%.c=$(HOST_OBJ)/%.o)
 HOST_BR_OBJS  := $(BEARSSL_SRCS:$(BEARSSL)/src/%.c=$(HOST_OBJ)/bearssl/%.o)
@@ -33,7 +48,7 @@ $(HOST_OBJ)/libbearssl.a: $(HOST_BR_OBJS)
 	rm -f $@
 	ar rcs $@ $^
 
-$(HOST_OBJ)/%.o: src/%.c src/*.h
+$(HOST_OBJ)/%.o: src/%.c src/*.h build/version.h
 	@mkdir -p $(dir $@)
 	$(HOST_CC) $(HOST_CFLAGS) -c -o $@ $<
 
@@ -46,7 +61,7 @@ DOS_CC     := $(DJGPP_PREFIX)gcc
 DOS_AR     := $(DJGPP_PREFIX)ar
 # -march=i386 keeps the binary runnable on a 386; tune for 486-class caches.
 DOS_ARCH   := -march=i386 -mtune=i486
-DOS_CFLAGS := -std=gnu99 -O2 $(DOS_ARCH) $(WARN) -I$(BEARSSL)/inc \
+DOS_CFLAGS := -std=gnu99 -O2 $(DOS_ARCH) $(WARN) -Ibuild -I$(BEARSSL)/inc \
               -I$(WATT_ROOT)/inc -Idos/watt32
 # BearSSL can't find an OS RNG or clock on DOS; we seed it and set the time.
 # The x86 extensions (AES-NI, SSE2, RDRAND) are disabled so no code path
@@ -58,16 +73,33 @@ DOS_OBJ    := build/dos
 DOS_APP_OBJS := $(SRCS:src/%.c=$(DOS_OBJ)/%.o)
 DOS_BR_OBJS  := $(BEARSSL_SRCS:$(BEARSSL)/src/%.c=$(DOS_OBJ)/bearssl/%.o)
 
-dos: $(DOS_OBJ)/AGENT.EXE $(DOS_OBJ)/CWSDPMI.EXE
+dos: $(DOS_OBJ)/DOSAGENT.EXE $(DOS_OBJ)/CWSDPMI.EXE
 
-$(DOS_OBJ)/AGENT.EXE: $(DOS_APP_OBJS) $(DOS_OBJ)/libbearssl.a \
+$(DOS_OBJ)/DOSAGENT.EXE: $(DOS_APP_OBJS) $(DOS_OBJ)/libbearssl.a \
                       $(DOS_OBJ)/libwatt.a
 	$(DOS_CC) -o $@ $(DOS_APP_OBJS) $(DOS_OBJ)/libbearssl.a \
 	    $(DOS_OBJ)/libwatt.a
 	$(DJGPP_PREFIX)strip $@
 
-$(DOS_OBJ)/CWSDPMI.EXE: third_party/cwsdpmi/CWSDPMI.EXE
-	cp $< $@
+# CWSDPMI is not in git: the binary distribution is downloaded once and
+# checked against a known hash.
+CWSDPMI_ZIP    := third_party/cwsdpmi/csdpmi7b.zip
+CWSDPMI_URL    := https://www.delorie.com/pub/djgpp/current/v2misc/csdpmi7b.zip
+CWSDPMI_SHA256 := deacda0488e1cdd7c4a9f32fab45662b34c0ed6b2d7d4d13bc07041b62004a8c
+
+$(CWSDPMI_ZIP):
+	@mkdir -p $(dir $@)
+	curl -fsSL -o $@.tmp $(CWSDPMI_URL)
+	echo "$(CWSDPMI_SHA256)  $@.tmp" | sha256sum -c --quiet
+	mv $@.tmp $@
+
+$(DOS_OBJ)/CWSDPMI.EXE: $(CWSDPMI_ZIP)
+	@mkdir -p $(dir $@)
+	unzip -p $< bin/CWSDPMI.EXE > $@
+
+$(DOS_OBJ)/CWSDPMI.DOC: $(CWSDPMI_ZIP)
+	@mkdir -p $(dir $@)
+	unzip -p $< bin/cwsdpmi.doc > $@
 
 # Watt-32: the DOS objects of src/makefile.all (CORE, BSD, BIND, ZLIB and the
 # DOS-only files), minus the Windows-only ones.
@@ -124,7 +156,7 @@ $(DOS_OBJ)/libbearssl.a: $(DOS_BR_OBJS)
 	rm -f $@
 	$(DOS_AR) rcs $@ $^
 
-$(DOS_OBJ)/%.o: src/%.c src/*.h
+$(DOS_OBJ)/%.o: src/%.c src/*.h build/version.h
 	@mkdir -p $(dir $@)
 	$(DOS_CC) $(DOS_CFLAGS) -c -o $@ $<
 
@@ -133,7 +165,31 @@ $(DOS_OBJ)/bearssl/%.o: $(BEARSSL)/src/%.c
 	@$(DOS_CC) -std=gnu99 -O2 $(DOS_ARCH) $(DOS_BR_DEFS) -I$(BEARSSL)/inc \
 	    -I$(BEARSSL)/src -c -o $@ $<
 
+# ---------------------------------------------------------------- release
+# Text files get CRLF line endings for DOS.
+DIST_DIR   := build/dist
+DIST_STAGE := $(DIST_DIR)/stage
+CRLF       := sed 's/\r*$$/\r/'
+CACERT     ?= /etc/ssl/certs/ca-certificates.crt
+
+dist: $(DOS_OBJ)/DOSAGENT.EXE $(DOS_OBJ)/CWSDPMI.EXE $(DOS_OBJ)/CWSDPMI.DOC
+	rm -rf $(DIST_STAGE) $(DIST_DIR)/DAGNT*.ZIP
+	mkdir -p $(DIST_STAGE)
+	cp $(DOS_OBJ)/DOSAGENT.EXE $(DOS_OBJ)/CWSDPMI.EXE $(DIST_STAGE)/
+	$(CRLF) $(DOS_OBJ)/CWSDPMI.DOC > $(DIST_STAGE)/CWSDPMI.DOC
+	$(CRLF) README.md > $(DIST_STAGE)/README.MD
+	$(CRLF) LICENSE > $(DIST_STAGE)/LICENSE.TXT
+	$(CRLF) DOSAGENT.CFG.example > $(DIST_STAGE)/DOSAGENT.CFG
+	$(CRLF) dist/WATTCP.CFG > $(DIST_STAGE)/WATTCP.CFG
+	$(CRLF) $(CACERT) > $(DIST_STAGE)/CACERT.PEM
+	{ cat dist/NOTICES.TXT; \
+	  sed -n -f dist/notice.sed $(WATT_SRC)/resolver.h; \
+	  printf '\n\nBearSSL\n-------\n\n'; \
+	  cat $(BEARSSL)/LICENSE.txt; } | $(CRLF) > $(DIST_STAGE)/NOTICES.TXT
+	cd $(DIST_STAGE) && zip -q -X -9 ../$(DIST_ZIP) *
+	@echo; unzip -l $(DIST_DIR)/$(DIST_ZIP)
+
 clean:
 	rm -rf build
 
-.PHONY: host dos clean
+.PHONY: host dos dist clean
