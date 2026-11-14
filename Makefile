@@ -19,7 +19,7 @@ BEARSSL_SRCS := $(shell find $(BEARSSL)/src -name '*.c')
 WARN := -Wall -Wextra -Wno-unused-parameter
 
 # Version and archive name from the git tag (see tools/version.sh).
-# make dist TAG=v0.1a builds as if HEAD had that tag.
+# make dist TAG=v0.1alpha builds as if HEAD had that tag.
 VERSION_INFO := $(shell sh tools/version.sh $(TAG))
 ifeq ($(VERSION_INFO),)
 $(error cannot determine the version)

@@ -62,17 +62,22 @@ texts). Text files get CRLF line endings.
 
 The version comes from the git tag on HEAD (`tools/version.sh`):
 
-| Tag on HEAD | Version shown | Archive        |
-|-------------|---------------|----------------|
-| `v0.1a`     | 0.1a          | `DAGNT01A.ZIP` |
-| `v1.0b`     | 1.0b          | `DAGNT10B.ZIP` |
-| `v1.0`      | 1.0           | `DAGNT10.ZIP`  |
-| none        | dev-<commit>  | `DAGNT.ZIP`    |
+| Tag on HEAD  | Version shown | Archive        |
+|--------------|---------------|----------------|
+| `v0.1alpha`  | 0.1alpha      | `DAGNT01A.ZIP` |
+| `v0.2beta2`  | 0.2beta2      | `DAGNT02B.ZIP` |
+| `v1.0rc1`    | 1.0rc1        | `DAGNT10R.ZIP` |
+| `v1.0`       | 1.0           | `DAGNT10.ZIP`  |
+| none         | dev-<commit>  | `DAGNT.ZIP`    |
 
-Major and minor versions are one digit each, so the name fits DOS's 8.3
-limit; the qualifier is an optional lowercase letter (a = alpha,
-b = beta). Other `v*` tags on HEAD make the build fail.
-`make dist TAG=v0.1a` builds exactly what that tag would, without tagging.
+Major and minor versions are one digit each, and only the qualifier's first
+letter goes into the archive name, so it fits DOS's 8.3 limit. The
+qualifier is optional; it starts with a lowercase letter and may contain
+lowercase letters, digits, `.` and `-`. Tags with the same first letter
+(`v0.1a`, `v0.1alpha`) give the same archive name. Other `v*` tags on HEAD
+make the build fail.
+`make dist TAG=v0.1alpha` builds exactly what that tag would, without
+tagging.
 
 GitHub Actions (`.github/workflows/build.yml`) runs `make dist` on every
 push and pull request and keeps the archive as a workflow artifact. Pushing
@@ -80,8 +85,8 @@ a `v*` tag also creates a GitHub release with the archive attached, marked
 as a pre-release when the version has a qualifier:
 
 ```
-git tag v0.1a
-git push origin v0.1a
+git tag v0.1alpha
+git push origin v0.1alpha
 ```
 
 ## Testing
