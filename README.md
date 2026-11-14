@@ -26,11 +26,11 @@ test/           mock API server, QEMU + FreeDOS test machine
 
 ## Building
 
-Dependencies go in `third_party/`:
+BearSSL and Watt-32 are git submodules in `third_party/`, pinned to the
+commits this was tested with. Clone with `git clone --recursive`, or run
+`git submodule update --init` in an existing clone. CWSDPMI is not in git:
 
 ```
-git clone https://www.bearssl.org/git/BearSSL third_party/bearssl
-git clone https://github.com/gvanem/Watt-32.git third_party/watt32
 mkdir third_party/cwsdpmi    # put CWSDPMI.EXE from csdpmi7b.zip here
 ```
 

@@ -1,0 +1,6 @@
+[submodule "third_party/bearssl"]
+	path = third_party/bearssl
+	url = https://www.bearssl.org/git/BearSSL
+[submodule "third_party/watt32"]
+	path = third_party/watt32
+	url = https://github.com/gvanem/Watt-32.git
