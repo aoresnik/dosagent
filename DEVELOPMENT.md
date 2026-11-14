@@ -36,7 +36,9 @@ DOS build: `make dos` produces `build/dos/DOSAGENT.EXE` and `CWSDPMI.EXE`.
 It needs `nasm`, `curl`, `unzip` and a DJGPP cross-compiler such as
 `i586-pc-msdosdjgpp-gcc` on `PATH`; set `DJGPP_PREFIX` if your toolchain
 uses a different prefix. The releases are built with GCC 12.2 from
-[build-djgpp](https://github.com/andrewwutw/build-djgpp) v3.4. Only its
+[build-djgpp](https://github.com/andrewwutw/build-djgpp) v3.4. Its prebuilt
+Linux binaries need the flex runtime library (`libfl2` on Debian/Ubuntu);
+the other packages listed there are only for building DJGPP itself. Only its
 `bin/` directory needs to be on `PATH`: its `setenv` script also exports
 `GCC_EXEC_PREFIX` and puts DJGPP's unprefixed `gcc` first on `PATH`, which
 breaks the host compiler.
