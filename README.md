@@ -10,6 +10,11 @@ Target: 386 or better, 4 MB RAM, DOS 5+ (or FreeDOS), a packet driver.
 Built with DJGPP, so it runs in 32-bit protected mode under CWSDPMI and
 leaves almost all conventional memory free for the programs it runs.
 
+Tested on a real 386 with 4 MB RAM and MS-DOS 5.0, connected through
+ETHERSLIP over a serial cable to slirp on a Linux machine, using a
+llama.cpp server without TLS: the first reply to a short prompt took about
+10 seconds. Also tested in QEMU with FreeDOS 1.4.
+
 **WARNING: NOT INTENDED TO BE USED AS A PRODUCTION SOLUTION, JUST AS A
 CURIOSITY**
 
@@ -41,6 +46,9 @@ contains:
 
 You also need a packet driver for your network card, loaded before
 DOSAGENT runs, for example `NE2000 0x60 <irq> <io>` in `AUTOEXEC.BAT`.
+Without a network card, a serial cable works too: run the ETHERSLIP packet
+driver (`ETHERSL`, from the Crynwr packet driver collection) on the DOS
+machine and slirp on the other end.
 
 If your network has no DHCP server, put a static address in `WATTCP.CFG`.
 DOSAGENT finds `WATTCP.CFG` next to `DOSAGENT.EXE`, or in the directory
