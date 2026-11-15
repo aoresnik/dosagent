@@ -141,6 +141,12 @@ too. For scripted runs, use `run.sh -headless` with `qemuctl.py`
 - `cd` and drive changes are handled inside the harness, so they persist
   between commands.
 
+**Floating point**
+- DOSAGENT.EXE is linked with `-lemu`, DJGPP's 387 emulator, so it runs on
+  a 386 or 486SX without an FPU (otherwise it dies with SIGNOFP unless
+  EMU387.DXE is present). An FPU is used when there is one. To test the
+  emulator on a machine with an FPU, `SET 387=N` before running.
+
 **Other limits**
 - Tool inputs are buffered by the API rather than streamed (no
   `eager_input_streaming`). A truncated input would be invalid JSON, which

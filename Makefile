@@ -73,12 +73,14 @@ DOS_OBJ    := build/dos
 DOS_APP_OBJS := $(SRCS:src/%.c=$(DOS_OBJ)/%.o)
 DOS_BR_OBJS  := $(BEARSSL_SRCS:$(BEARSSL)/src/%.c=$(DOS_OBJ)/bearssl/%.o)
 
+# -lemu links in the 387 emulator, so a 386 or 486SX without an FPU does
+# not need EMU387.DXE (without either, the program dies with SIGNOFP).
 dos: $(DOS_OBJ)/DOSAGENT.EXE $(DOS_OBJ)/CWSDPMI.EXE
 
 $(DOS_OBJ)/DOSAGENT.EXE: $(DOS_APP_OBJS) $(DOS_OBJ)/libbearssl.a \
                       $(DOS_OBJ)/libwatt.a
 	$(DOS_CC) -o $@ $(DOS_APP_OBJS) $(DOS_OBJ)/libbearssl.a \
-	    $(DOS_OBJ)/libwatt.a
+	    $(DOS_OBJ)/libwatt.a -lemu
 	$(DJGPP_PREFIX)strip $@
 
 # CWSDPMI is not in git: the binary distribution is downloaded once and
