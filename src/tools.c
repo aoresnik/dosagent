@@ -1,5 +1,6 @@
 #include "tools.h"
 #include "charset.h"
+#include "net.h"
 #include "platform.h"
 
 #include <ctype.h>
@@ -310,11 +311,13 @@ static int run_command(const jval *in, buf_t *res)
     dup2(fd, 2);
     close(fd);
 
+    net_release_driver();
     status = system(cmd);
 
     dup2(saved_in, 0);
     dup2(saved_out, 1);
     dup2(saved_err, 2);
+    net_reclaim_driver();
     close(saved_in);
     close(saved_out);
     close(saved_err);

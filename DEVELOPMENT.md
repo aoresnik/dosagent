@@ -140,6 +140,11 @@ too. For scripted runs, use `run.sh -headless` with `qemuctl.py`
   instead, for programs that write to video memory.
 - `cd` and drive changes are handled inside the harness, so they persist
   between commands.
+- The packet driver is released while a command runs and reopened after
+  (Watt-32's `_eth_release()`/`_eth_init()`). Watt-32 receives every
+  packet type, so otherwise a program with its own TCP/IP stack, such as
+  mTCP's PING or HTGET, gets no packets. The IP address and ARP cache are
+  kept; a kept-alive API connection may need a reconnect afterwards.
 
 **Floating point**
 - DOSAGENT.EXE is linked with `-lemu`, DJGPP's 387 emulator, so it runs on

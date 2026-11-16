@@ -312,6 +312,23 @@ int net_init(void)
     return 0;
 }
 
+void net_release_driver(void)
+{
+#ifdef __DJGPP__
+    _eth_release();
+#endif
+}
+
+void net_reclaim_driver(void)
+{
+#ifdef __DJGPP__
+    if (_eth_init() != 0)
+        fprintf(stderr, "Cannot reopen the packet driver. If the command "
+                        "left it in use, the network is down until "
+                        "restart.\n");
+#endif
+}
+
 /* Wait until fd is readable, polling the abort flag every 200 ms.
  * Returns 1 when readable, -1 on abort or error. */
 static int wait_readable(int fd)

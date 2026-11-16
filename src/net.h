@@ -10,6 +10,13 @@ typedef struct conn conn_t;
 /* One-time stack initialisation (Watt-32 sock_init on DOS). 0 on success. */
 int net_init(void);
 
+/* Give the packet driver up while another program runs, and take it back
+ * after. Watt-32 receives all packet types, so while it holds the driver a
+ * child's own TCP/IP stack (mTCP PING, HTGET) gets no packets. No-ops on
+ * the host. */
+void net_release_driver(void);
+void net_reclaim_driver(void);
+
 /* Set from a SIGINT handler / keyboard poll; aborts blocking I/O. */
 extern volatile int net_abort;
 /* Set when the last conn_open failed in a way retrying won't fix (bad
