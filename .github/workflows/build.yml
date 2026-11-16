@@ -51,5 +51,7 @@ jobs:
           version=$(sh tools/version.sh | cut -d' ' -f1)
           prerelease=
           case $version in [0-9].[0-9]) ;; *) prerelease=--prerelease ;; esac
+          # Notes: this version's section of CHANGELOG.md (make dist).
           gh release create "$GITHUB_REF_NAME" build/dist/*.ZIP \
-              --title "DOSAGENT $version" --generate-notes $prerelease
+              --title "DOSAGENT $version" \
+              --notes-file build/dist/RELNOTES.md $prerelease

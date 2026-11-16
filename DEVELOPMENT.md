@@ -17,7 +17,8 @@ src/charset.c   CP437 <-> UTF-8
 src/platform.c  DOS vs POSIX: keyboard, screen, entropy
 dos/watt32/     generated Watt-32 errno files (see Building)
 dist/           files that only go into the release archive
-tools/          version.sh: version and archive name from the git tag
+tools/          version.sh: version and archive name from the git tag;
+                relnotes.sh: release notes from CHANGELOG.md
 test/           mock API server, QEMU + FreeDOS test machine
 .github/        GitHub Actions workflow that builds releases
 ```
@@ -79,14 +80,37 @@ make the build fail.
 `make dist TAG=v0.1alpha` builds exactly what that tag would, without
 tagging.
 
+Release notes come from `CHANGELOG.md` ([Keep a
+Changelog](https://keepachangelog.com/en/1.1.0/) format). Note changes
+under `## [Unreleased]` as you make them. `make dist` writes the section
+for the version being built to `build/dist/RELNOTES.md` (the Unreleased
+section for untagged builds). For a release build it fails if that version
+has no section or the section is empty.
+
 GitHub Actions (`.github/workflows/build.yml`) runs `make dist` on every
 push and pull request and keeps the archive as a workflow artifact. Pushing
-a `v*` tag also creates a GitHub release with the archive attached, marked
-as a pre-release when the version has a qualifier:
+a `v*` tag also creates a GitHub release with the archive attached and
+`RELNOTES.md` as its description, marked as a pre-release when the version
+has a qualifier.
+
+To release, rename `## [Unreleased]` to the new version, add an empty
+`## [Unreleased]` above it, and update the links at the bottom of
+`CHANGELOG.md`:
 
 ```
-git tag v0.1alpha
-git push origin v0.1alpha
+## [Unreleased]
+
+## [0.1alpha3] - 2026-11-20
+...
+[Unreleased]: https://github.com/aoresnik/dosagent/compare/v0.1alpha3...HEAD
+[0.1alpha3]: https://github.com/aoresnik/dosagent/compare/v0.1alpha2...v0.1alpha3
+```
+
+Check it with `make dist TAG=v0.1alpha3`, commit, then tag and push:
+
+```
+git tag v0.1alpha3
+git push origin main v0.1alpha3
 ```
 
 ## Testing

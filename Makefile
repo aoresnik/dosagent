@@ -3,6 +3,7 @@
 #   make host    Linux/POSIX test build -> build/host/agent
 #   make dos     DJGPP cross build      -> build/dos/DOSAGENT.EXE
 #   make dist    release archive        -> build/dist/DAGNTxyq.ZIP
+#                and release notes      -> build/dist/RELNOTES.md
 #
 # For the DOS build, set DJGPP_PREFIX to your cross-compiler prefix. Watt-32
 # is compiled from its sources here, without its configur.sh; the errno files
@@ -175,8 +176,10 @@ CRLF       := sed 's/\r*$$/\r/'
 CACERT     ?= /etc/ssl/certs/ca-certificates.crt
 
 dist: $(DOS_OBJ)/DOSAGENT.EXE $(DOS_OBJ)/CWSDPMI.EXE $(DOS_OBJ)/CWSDPMI.DOC
-	rm -rf $(DIST_STAGE) $(DIST_DIR)/DAGNT*.ZIP
+	rm -rf $(DIST_STAGE) $(DIST_DIR)/DAGNT*.ZIP $(DIST_DIR)/RELNOTES.md
 	mkdir -p $(DIST_STAGE)
+	sh tools/relnotes.sh $(VERSION) > $(DIST_DIR)/RELNOTES.tmp
+	mv $(DIST_DIR)/RELNOTES.tmp $(DIST_DIR)/RELNOTES.md
 	cp $(DOS_OBJ)/DOSAGENT.EXE $(DOS_OBJ)/CWSDPMI.EXE $(DIST_STAGE)/
 	$(CRLF) $(DOS_OBJ)/CWSDPMI.DOC > $(DIST_STAGE)/CWSDPMI.DOC
 	$(CRLF) README.md > $(DIST_STAGE)/README.MD
