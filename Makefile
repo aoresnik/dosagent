@@ -175,14 +175,18 @@ DIST_STAGE := $(DIST_DIR)/stage
 CRLF       := sed 's/\r*$$/\r/'
 CACERT     ?= /etc/ssl/certs/ca-certificates.crt
 
-dist: $(DOS_OBJ)/DOSAGENT.EXE $(DOS_OBJ)/CWSDPMI.EXE $(DOS_OBJ)/CWSDPMI.DOC
+dist: $(DOS_OBJ)/DOSAGENT.EXE $(DOS_OBJ)/CWSDPMI.EXE $(DOS_OBJ)/CWSDPMI.DOC \
+      docs/dosagent.png
 	rm -rf $(DIST_STAGE) $(DIST_DIR)/DAGNT*.ZIP $(DIST_DIR)/RELNOTES.md
 	mkdir -p $(DIST_STAGE)
 	sh tools/relnotes.sh $(VERSION) > $(DIST_DIR)/RELNOTES.tmp
 	mv $(DIST_DIR)/RELNOTES.tmp $(DIST_DIR)/RELNOTES.md
 	cp $(DOS_OBJ)/DOSAGENT.EXE $(DOS_OBJ)/CWSDPMI.EXE $(DIST_STAGE)/
 	$(CRLF) $(DOS_OBJ)/CWSDPMI.DOC > $(DIST_STAGE)/CWSDPMI.DOC
-	$(CRLF) README.md > $(DIST_STAGE)/README.MD
+	cp docs/dosagent.png $(DIST_STAGE)/DOSAGENT.PNG
+	# The archive is flat, so the screenshot link points next to README.MD.
+	sed 's#(docs/dosagent\.png)#(DOSAGENT.PNG)#' README.md | $(CRLF) \
+	    > $(DIST_STAGE)/README.MD
 	$(CRLF) LICENSE > $(DIST_STAGE)/LICENSE.TXT
 	$(CRLF) DOSAGENT.CFG.example > $(DIST_STAGE)/DOSAGENT.CFG
 	$(CRLF) dist/WATTCP.CFG > $(DIST_STAGE)/WATTCP.CFG

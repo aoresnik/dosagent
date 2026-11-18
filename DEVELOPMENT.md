@@ -55,7 +55,8 @@ them if you change the DJGPP version.
 
 `make dist` builds the release archive in `build/dist/`, so you can check
 it before publishing. It contains `DOSAGENT.EXE`, `CWSDPMI.EXE` and
-`CWSDPMI.DOC`, `README.md` as `README.MD`, `LICENSE` as `LICENSE.TXT`,
+`CWSDPMI.DOC`, `README.md` as `README.MD` (with `docs/dosagent.png` as
+`DOSAGENT.PNG`), `LICENSE` as `LICENSE.TXT`,
 `DOSAGENT.CFG.example` as `DOSAGENT.CFG`, `dist/WATTCP.CFG`, a CA bundle as
 `CACERT.PEM` (from `CACERT`, default `/etc/ssl/certs/ca-certificates.crt`)
 and `NOTICES.TXT` (`dist/NOTICES.TXT` plus the Watt-32 and BearSSL license

@@ -45,6 +45,7 @@ contains:
 - `WATTCP.CFG`: network settings, set up for DHCP
 - `CACERT.PEM`: trusted root certificates for HTTPS
 - `LICENSE.TXT`: the license (Apache 2.0)
+- `DOSAGENT.PNG`: the screenshot shown in this README
 - `NOTICES.TXT`: third-party copyright notices
 
 You also need a packet driver for your network card, loaded before
