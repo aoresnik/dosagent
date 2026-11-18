@@ -15,6 +15,9 @@ EtherSLIP over a serial cable to slirp on a Linux machine, using a
 llama.cpp server without TLS: the first reply to a short prompt took about
 10 seconds. Also tested in QEMU with FreeDOS 1.4.
 
+![DOSAGENT on MS-DOS 5.0 answering "What kind of machine are you running
+on?" using a local model](https://raw.githubusercontent.com/aoresnik/dosagent/main/docs/dosagent.png)
+
 **WARNING: NOT INTENDED TO BE USED AS A PRODUCTION SOLUTION, JUST AS A
 CURIOSITY**
 
