@@ -3,7 +3,9 @@
 #   boot.img  FreeDOS 1.4 boot floppy, set up to skip the installer, load the
 #             NE2000 packet driver and switch to C:
 #   hdd.img   FAT16 hard disk with CWSDPMI, mTCP tools, configs, the CA
-#             bundle and DOSAGENT.EXE (if built)
+#             bundle and DOSAGENT.EXE (if built), FreeDOS packages from
+#             dl/pkg/ installed in C:\FREEDOS, and the zips in dl/sample/
+#             copied to C:\PKG for the agent to install
 # Re-run after rebuilding DOSAGENT.EXE (only hdd.img is refreshed then).
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -20,7 +22,7 @@ if [ ! -f boot.img ]; then
     cat > fdauto.tmp <<'EOF'
 @echo off
 SET DOSDIR=A:\FREEDOS
-SET PATH=A:\FREEDOS\BIN;C:\BIN
+SET PATH=A:\FREEDOS\BIN;C:\BIN;C:\FREEDOS\BIN;C:\FREEDOS\DEVEL\BWBASIC
 SET TEMP=C:\TEMP
 SET WATTCP.CFG=C:\NET
 SET MTCPCFG=C:\NET\MTCP.CFG
@@ -52,7 +54,7 @@ with open(path, "r+b") as f:
     f.write(data)
 EOF
 IMG="hdd.img@@16384"
-mmd -i "$IMG" ::BIN ::NET ::TEMP ::WORK ::AGENT
+mmd -i "$IMG" ::BIN ::NET ::TEMP ::WORK ::AGENT ::FREEDOS ::PKG
 
 unzip -q -o "$DL/pktd11.zip" NE2000.COM -d "$DL"
 mcopy -o -i "$IMG" "$DL/NE2000.COM" ::NET/
@@ -70,6 +72,21 @@ mcopy -o -i "$IMG" wattcp.tmp ::NET/WATTCP.CFG
 printf 'PACKETINT 0x60\r\n' > mtcp.tmp
 mcopy -o -i "$IMG" mtcp.tmp ::NET/MTCP.CFG
 rm -f wattcp.tmp mtcp.tmp
+
+# FreeDOS packages (zips from the FreeDOS repository, see DEVELOPMENT.md):
+# dl/pkg/*.zip are installed by unpacking them into C:\FREEDOS, without
+# their sources; dl/sample/*.zip are copied unchanged to C:\PKG.
+for pkg in "$DL"/pkg/*.zip; do
+    [ -f "$pkg" ] || continue
+    rm -rf "$DL/pkg.tmp"
+    unzip -q -o -C "$pkg" -x 'SOURCE/*' -d "$DL/pkg.tmp"
+    mcopy -s -o -i "$IMG" "$DL"/pkg.tmp/* ::FREEDOS/
+    rm -rf "$DL/pkg.tmp"
+done
+for pkg in "$DL"/sample/*.zip; do
+    [ -f "$pkg" ] || continue
+    mcopy -o -i "$IMG" "$pkg" "::PKG/$(basename "$pkg" | tr a-z A-Z)"
+done
 
 # Agent files.
 if [ -f "$ROOT/build/dos/DOSAGENT.EXE" ]; then

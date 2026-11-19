@@ -131,7 +131,19 @@ user networking.
 2. Optionally put config files (`*.CFG`) in `test/qemu/`. They are copied
    to `C:\AGENT`; run `C:\AGENT\DOSAGENT -c C:\AGENT\NAME.CFG` for one
    other than `DOSAGENT.CFG`.
-3. Run `./mkimages.sh`, then `./run.sh`.
+3. Optionally add FreeDOS packages from the
+   [FreeDOS 1.4 repository](https://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/repositories/1.4/):
+   - Zips in `test/qemu/dl/pkg/` are installed into `C:\FREEDOS`, which is
+     on `PATH`. Useful ones: `base/edit.zip`, `devel/bwbasic.zip`,
+     `archiver/unzip.zip`, `base/devload.zip`, `base/find.zip` and
+     `base/more.zip` (the boot floppy's own MORE comes first on `PATH`).
+   - Zips in `test/qemu/dl/sample/` are copied unchanged to `C:\PKG`, as
+     software for the agent to install, e.g. `base/nansi.zip` with the
+     prompt "Install the NANSI driver from C:\PKG\NANSI.ZIP into
+     C:\FREEDOS and load it now without rebooting" (needs UNZIP and
+     DEVLOAD).
+4. Run `./mkimages.sh`, then `./run.sh`. `boot.img` is only created when it
+   is missing; delete it to pick up changes to its setup (such as `PATH`).
 
 From inside the guest, the host is 10.0.2.2, so the mock server works there
 too. For scripted runs, use `run.sh -headless` with `qemuctl.py`
