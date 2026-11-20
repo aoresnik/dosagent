@@ -165,10 +165,71 @@ static long parse_date_days(const char *s)
 
 /* ------------------------------------------------------------ prompt */
 
-static void build_system_prompt(buf_t *sp)
+#define AGENTS_FILE "AGENTS.TXT"
+#define AGENTS_MAX 32768L
+
+/* Appends one AGENTS.TXT to notes, unless it is missing or is the file
+ * already loaded (seen). full receives its canonical path. */
+static void add_agents_file(buf_t *notes, const char *path, char *full,
+                            const char *seen)
 {
-    char cwd[PATH_MAX];
-    buf_t os;
+    char shown[PATH_MAX], chunk[2048], *p;
+    buf_t raw;
+    FILE *f;
+    size_t i, n;
+
+    if (!realpath(path, full) || (f = fopen(full, "rb")) == NULL) {
+        full[0] = 0;
+        return;
+    }
+#if PLAT_DOS
+    if (strcasecmp(full, seen) == 0) {
+#else
+    if (strcmp(full, seen) == 0) {
+#endif
+        fclose(f);
+        return;
+    }
+    snprintf(shown, sizeof shown, "%s", full);
+#if PLAT_DOS
+    /* DJGPP's realpath gives c:/agent/agents.txt; show C:\AGENT\AGENTS.TXT. */
+    for (p = shown; *p; p++)
+        *p = *p == '/' ? '\\' : toupper((unsigned char)*p);
+#else
+    (void)p;
+#endif
+    buf_init(&raw);
+    while (raw.len <= (size_t)AGENTS_MAX &&
+           (n = fread(chunk, 1, sizeof chunk, f)) > 0)
+        buf_append(&raw, chunk, n);
+    fclose(f);
+    if (raw.len > (size_t)AGENTS_MAX) {
+        raw.len = AGENTS_MAX;
+        printf("warning: %s is over %ld bytes; the rest is ignored.\n",
+               shown, AGENTS_MAX);
+    }
+    /* Drop CRs and a DOS end-of-file mark. */
+    for (i = n = 0; i < raw.len; i++)
+        if (raw.p[i] != '\r' && raw.p[i] != 0x1a)
+            raw.p[n++] = raw.p[i];
+    raw.len = n;
+
+    buf_puts(notes, "Contents of ");
+    local_to_utf8(notes, shown, strlen(shown));
+    buf_puts(notes, ":\n");
+    local_to_utf8(notes, raw.p ? raw.p : "", raw.len);
+    if (raw.len && raw.p[raw.len - 1] != '\n')
+        buf_putc(notes, '\n');
+    buf_putc(notes, '\n');
+    printf("Loaded %s.\n", shown);
+    buf_free(&raw);
+}
+
+static void build_system_prompt(buf_t *sp, const char *argv0)
+{
+    char cwd[PATH_MAX], path[PATH_MAX];
+    char exe_file[PATH_MAX] = "", cwd_file[PATH_MAX];
+    buf_t os, notes;
 
     buf_init(&os);
     plat_describe(&os);
@@ -215,6 +276,21 @@ static void build_system_prompt(buf_t *sp)
         "- The user approves each command and file change and may decline.\n");
 #endif
     buf_free(&os);
+
+    /* AGENTS.TXT next to the executable, then in the current directory. */
+    buf_init(&notes);
+    exe_relative(path, sizeof path, argv0, AGENTS_FILE);
+    add_agents_file(&notes, path, exe_file, "");
+    add_agents_file(&notes, AGENTS_FILE, cwd_file, exe_file);
+    if (notes.len) {
+        buf_puts(sp,
+            "\nThe user keeps notes for you in " AGENTS_FILE " files: "
+            "instructions and facts about this machine and how to work on "
+            "it. Follow them. Where they conflict, the later file takes "
+            "precedence.\n\n");
+        buf_append(sp, notes.p, notes.len);
+    }
+    buf_free(&notes);
 }
 
 /* ------------------------------------------------------------ agent loop */
@@ -385,7 +461,7 @@ static void print_help(void)
            "Esc or Ctrl-C interrupts the model.\n"
            "Commands:\n"
            "  /help            this text\n"
-           "  /clear           start a new conversation\n"
+           "  /clear           start a new conversation, re-read AGENTS.TXT\n"
            "  /confirm         toggle approval prompts (now %s)\n"
            "  /model NAME      switch model (now %s)\n"
            "  /effort LEVEL    low, medium, high, xhigh, max (now %s)\n"
@@ -458,7 +534,7 @@ int main(int argc, char **argv)
 
     tools_init(cfg.temp_dir, cfg.max_output);
     buf_init(&sp);
-    build_system_prompt(&sp);
+    build_system_prompt(&sp, argv[0]);
     system_prompt = sp.p;
 
     acfg.target.host = cfg.host;
@@ -526,6 +602,11 @@ int main(int argc, char **argv)
                 print_help();
             else if (strcmp(cmd, "/clear") == 0) {
                 conv_free(&conv);
+                /* Re-read AGENTS.TXT, so edits to it take effect. */
+                buf_free(&sp);
+                buf_init(&sp);
+                build_system_prompt(&sp, argv[0]);
+                system_prompt = sp.p;
                 printf("Conversation cleared.\n");
             } else if (strcmp(cmd, "/confirm") == 0) {
                 cfg.confirm = !cfg.confirm;

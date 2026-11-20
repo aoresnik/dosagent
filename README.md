@@ -101,6 +101,17 @@ as they are. The model's chat template must support tool calls. Tested
 with Qwen3.8-27B: tool calls, command approval and multi-turn sessions
 work.
 
+### Notes for the agent (AGENTS.TXT)
+
+Put instructions and facts the agent should always know into a plain text
+file called `AGENTS.TXT`, for example where your compiler is, how to build
+and test your project, or what not to touch. DOSAGENT reads `AGENTS.TXT`
+from the directory of `DOSAGENT.EXE` (notes for the whole machine) and then
+from the current directory (notes for one project), and adds both to the
+model's instructions. Where they conflict, the current directory's file
+wins. Each file can be up to 32 KB. The files are read at start-up and
+again on `/clear`.
+
 ## Using
 
 Run `DOSAGENT`. You can also give the first request on the command line:

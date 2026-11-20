@@ -9,6 +9,8 @@ release tags without the leading `v` (see DEVELOPMENT.md, Releases).
 ### Added
 - Prompt line editing: cursor keys, Home/End, word movement, Delete,
   overwrite mode, and Up/Down history of earlier prompts.
+- AGENTS.TXT: notes for the agent, read from the directory of DOSAGENT.EXE
+  and from the current directory, and added to the model's instructions.
 
 ### Fixed
 - Programs with their own TCP/IP stack, such as mTCP's PING and HTGET, got
