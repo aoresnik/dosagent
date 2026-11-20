@@ -498,6 +498,7 @@ int main(int argc, char **argv)
                 int n = plat_read_line(line, sizeof line);
                 if (n < 0)
                     goto quit;
+                plat_add_history(line);
                 if (n > 0 && line[n - 1] == '\\') {
                     line[n - 1] = 0;
                     buf_puts(&input, line);

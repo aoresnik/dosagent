@@ -6,6 +6,10 @@ release tags without the leading `v` (see DEVELOPMENT.md, Releases).
 
 ## [Unreleased]
 
+### Added
+- Prompt line editing: cursor keys, Home/End, word movement, Delete,
+  overwrite mode, and Up/Down history of earlier prompts.
+
 ### Fixed
 - Programs with their own TCP/IP stack, such as mTCP's PING and HTGET, got
   no network replies when run through the agent. DOSAGENT now releases the

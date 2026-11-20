@@ -109,6 +109,10 @@ Run `DOSAGENT`. You can also give the first request on the command line:
 Keys and commands:
 
 - Esc or Ctrl-C interrupts the model.
+- Editing a prompt: Left/Right, Home/End, Ctrl-Left/Right (by word), Del,
+  Backspace, Ctrl-Backspace (word), Ctrl-K (to the end), Ins (overwrite),
+  Esc (clear). Up/Down recall earlier prompts. End a line with `\` to
+  continue the prompt on the next line.
 - At an approval prompt: Y = yes, N = no (you can type a reason), A = stop
   asking.
 - Commands: `/help`, `/clear`, `/confirm`, `/model NAME`,
