@@ -6,6 +6,8 @@ release tags without the leading `v` (see DEVELOPMENT.md, Releases).
 
 ## [Unreleased]
 
+## [0.1alpha3] - 2026-11-21
+
 ### Added
 - Prompt line editing: cursor keys, Home/End, word movement, Delete,
   overwrite mode, and Up/Down history of earlier prompts.
@@ -36,6 +38,7 @@ release tags without the leading `v` (see DEVELOPMENT.md, Releases).
 - Release archive with CWSDPMI, a CA bundle, and a WATTCP.CFG set up for
   DHCP.
 
-[Unreleased]: https://github.com/aoresnik/dosagent/compare/v0.1alpha2...HEAD
+[Unreleased]: https://github.com/aoresnik/dosagent/compare/v0.1alpha3...HEAD
+[0.1alpha3]: https://github.com/aoresnik/dosagent/compare/v0.1alpha2...v0.1alpha3
 [0.1alpha2]: https://github.com/aoresnik/dosagent/compare/v0.1alpha...v0.1alpha2
 [0.1alpha]: https://github.com/aoresnik/dosagent/releases/tag/v0.1alpha
