@@ -18,6 +18,42 @@ llama.cpp server without TLS: the first reply to a short prompt took about
 ![DOSAGENT on MS-DOS 5.0 answering "What kind of machine are you running
 on?" using a local model](docs/dosagent.png)
 
+## What it's useful for
+
+DOSAGENT brings to DOS what coding agents do on current systems: the model
+looks around, runs programs, reads and changes files and checks the
+results, while you watch and approve. Uses that have been tried:
+
+- **Writing small command-line programs** with the compilers and
+  interpreters on the machine. Tested with Bywater BASIC (`BWBASIC`, a
+  FreeDOS package), Borland Turbo C 2.01 and Borland Turbo Pascal 5.5 (both
+  free from the Borland software museum). The agent writes the source,
+  runs the compiler, reads its error messages, fixes the code and runs the
+  program to check what it prints.
+- **Simple administration**, such as installing the NANSI.SYS ANSI console
+  driver from its ZIP: the agent unpacked it and loaded it with `DEVLOAD`.
+- **Finding out about the machine**: what's in `AUTOEXEC.BAT` and
+  `CONFIG.SYS`, how much memory is free, what an old directory contains.
+- **Running network programs** such as mTCP's `PING` and `HTGET` for you.
+
+Example requests:
+
+```
+Write a Turbo Pascal program that counts the lines, words and characters
+in a text file. Compile it and test it on AUTOEXEC.BAT.
+
+Install the ANSI driver in C:\PKG\NANSI.ZIP.
+
+What kind of machine are you running on?
+```
+
+Tips:
+
+- Tell the agent where your compilers are and how you like to work in
+  `AGENTS.TXT` (see below), so it doesn't have to search every time.
+- Use command-line tools such as `TCC` and `TPC` rather than the IDEs: the
+  agent can't type into a program that waits for keys.
+
 **WARNING: NOT INTENDED TO BE USED AS A PRODUCTION SOLUTION, JUST AS A
 CURIOSITY**
 
