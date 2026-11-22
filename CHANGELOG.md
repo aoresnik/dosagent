@@ -6,6 +6,10 @@ release tags without the leading `v` (see DEVELOPMENT.md, Releases).
 
 ## [Unreleased]
 
+### Fixed
+- The model's instructions said the screen is 80x25 even in other text
+  modes, such as 80x50, contradicting the measured size given above them.
+
 ## [0.1alpha3] - 2026-11-21
 
 ### Added

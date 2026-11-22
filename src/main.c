@@ -248,9 +248,9 @@ static void build_system_prompt(buf_t *sp, const char *argv0)
 #if PLAT_DOS
     buf_puts(sp,
         "About this environment:\n"
-        "- The user reads your replies on an 80x25 text console with no "
-        "Markdown rendering. Write plain text with short lines; no tables, "
-        "headings or emoji. Stick to characters in code page 437.\n"
+        "- The user reads your replies on the text screen described above, "
+        "with no Markdown rendering. Write plain text with short lines; no "
+        "tables, headings or emoji. Stick to characters in code page 437.\n"
         "- DOS is single-tasking with no memory protection. A program that "
         "waits for keyboard input, hangs, or crashes freezes the whole "
         "machine until the user reboots, and there is no timeout. Do not "
