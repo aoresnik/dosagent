@@ -6,6 +6,12 @@ release tags without the leading `v` (see DEVELOPMENT.md, Releases).
 
 ## [Unreleased]
 
+## [0.1beta] - 2026-11-24
+
+### Changed
+- README.MD describes what DOSAGENT is useful for, with use cases that
+  have been tested.
+
 ### Fixed
 - The model's instructions said the screen is 80x25 even in other text
   modes, such as 80x50, contradicting the measured size given above them.
@@ -42,7 +48,8 @@ release tags without the leading `v` (see DEVELOPMENT.md, Releases).
 - Release archive with CWSDPMI, a CA bundle, and a WATTCP.CFG set up for
   DHCP.
 
-[Unreleased]: https://github.com/aoresnik/dosagent/compare/v0.1alpha3...HEAD
+[Unreleased]: https://github.com/aoresnik/dosagent/compare/v0.1beta...HEAD
+[0.1beta]: https://github.com/aoresnik/dosagent/compare/v0.1alpha3...v0.1beta
 [0.1alpha3]: https://github.com/aoresnik/dosagent/compare/v0.1alpha2...v0.1alpha3
 [0.1alpha2]: https://github.com/aoresnik/dosagent/compare/v0.1alpha...v0.1alpha2
 [0.1alpha]: https://github.com/aoresnik/dosagent/releases/tag/v0.1alpha
