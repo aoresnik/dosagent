@@ -165,6 +165,25 @@ model's instructions. Where they conflict, the current directory's file
 wins. Each file can be up to 32 KB. The files are read at start-up and
 again on `/clear`.
 
+### Sessions and transcripts
+
+Set `session_dir` in `DOSAGENT.CFG`, for example `session_dir=SESSIONS`
+(a relative path is next to `DOSAGENT.EXE`). DOSAGENT then saves each
+conversation as it goes, in two files named after the date, such as
+`26112501.SES` and `26112501.TXT`:
+
+- The `.SES` file holds the conversation for resuming it. It is written
+  after every step, so it survives a crash or a reboot.
+- The `.TXT` file is a transcript you can read with `TYPE`, `EDIT` or
+  `MORE`: your prompts with the time, the replies, each command or file
+  change with its full output, and token use.
+
+`DOSAGENT -r` continues the latest session, `DOSAGENT -r 26112501` a
+particular one, and `/resume` does the same from the prompt. It shows the
+end of the transcript so you can see where you left off. A command that
+was running when the machine crashed is reported to the model as not
+finished. `/clear` starts a new session.
+
 ## Using
 
 Run `DOSAGENT`. You can also give the first request on the command line:
@@ -180,8 +199,8 @@ Keys and commands:
   continue the prompt on the next line.
 - At an approval prompt: Y = yes, N = no (you can type a reason), A = stop
   asking.
-- Commands: `/help`, `/clear`, `/confirm`, `/model NAME`,
-  `/effort LEVEL`, `/quit`.
+- Commands: `/help`, `/clear`, `/resume [NAME]`, `/confirm`,
+  `/model NAME`, `/effort LEVEL`, `/quit`.
 
 Things to know:
 
@@ -194,6 +213,8 @@ Things to know:
   capture instead of output redirection; the model asks for it.
 - The whole conversation is resent every turn. Use `/clear` when it gets
   long.
+- Session files contain everything sent to the model, including file
+  contents and command output it saw.
 - On a real 386, the first HTTPS connection takes a while; later requests
   reuse the session.
 

@@ -59,3 +59,8 @@ temp_dir=C:\TEMP
 
 # Entropy carried across runs for the TLS random generator.
 seed_file=RANDSEED.BIN
+
+# Save each conversation in this directory, as a session file that
+# DOSAGENT -r can resume (YYMMDDnn.SES) and a readable transcript
+# (YYMMDDnn.TXT). A relative path is next to DOSAGENT.EXE. Empty = off.
+session_dir=

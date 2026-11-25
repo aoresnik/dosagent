@@ -14,7 +14,7 @@ WATT_ROOT    ?= third_party/watt32
 BEARSSL      := third_party/bearssl
 
 SRCS := src/main.c src/api.c src/http.c src/net.c src/tools.c \
-        src/json.c src/buf.c src/charset.c src/platform.c
+        src/json.c src/buf.c src/charset.c src/platform.c src/session.c
 BEARSSL_SRCS := $(shell find $(BEARSSL)/src -name '*.c')
 
 WARN := -Wall -Wextra -Wno-unused-parameter

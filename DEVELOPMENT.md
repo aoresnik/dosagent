@@ -15,6 +15,7 @@ src/tools.c     run_command, read_file, write_file, edit_file, list_dir,
 src/json.c      small JSON DOM parser and writer
 src/charset.c   CP437 <-> UTF-8
 src/platform.c  DOS vs POSIX: keyboard, screen, entropy
+src/session.c   session files (.SES) and transcripts (.TXT), resume
 dos/watt32/     generated Watt-32 errno files (see Building)
 dist/           files that only go into the release archive
 tools/          version.sh: version and archive name from the git tag;
@@ -170,6 +171,25 @@ too. For scripted runs, use `run.sh -headless` with `qemuctl.py`
   This keeps thinking-block signatures valid and makes prompt caching
   effective.
 - The whole conversation is resent each turn. There is no compaction yet.
+
+**Sessions**
+- With `session_dir` set, every block `conv_append` adds is also written
+  to a `.SES` file as one JSON line, `{"role":"user","block":{...}}`, with
+  the block kept byte for byte. The first line holds the version, start
+  time, model, server and system prompt; `{"model":...}` lines record
+  `/model` switches. A resume replays the lines, so thinking signatures
+  and tool_use ids stay valid and the prompt cache still matches.
+- Each line is committed with `fsync`, since a DOS crash loses whatever is
+  still buffered. A cut-off last line is skipped on load. A tool call
+  without a result (the machine died while it ran) gets an error result
+  saying it may or may not have run.
+- The `.TXT` transcript is written in the local code page with CRLF: the
+  prompts with timestamps, slash commands, the replies (and thinking, if
+  shown), each tool call with the full result the model got, and the
+  usage lines. Text that was streamed but then discarded (an interrupted
+  reply) is not in either file.
+- A resumed session uses its saved system prompt, so `AGENTS.TXT` is read
+  again only on `/clear`, as within one run.
 
 **Running commands**
 - `run_command` captures stdout and stderr through handle redirection, and

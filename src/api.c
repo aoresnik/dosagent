@@ -10,6 +10,8 @@
 
 /* ------------------------------------------------------------ conversation */
 
+void (*conv_log)(const char *role, const char *block_json);
+
 void conv_init(conv_t *c)
 {
     memset(c, 0, sizeof *c);
@@ -40,6 +42,8 @@ void conv_append(conv_t *c, const char *role, const char *block_json)
         buf_init(&m->content);
     }
     buf_puts(&m->content, block_json);
+    if (conv_log)
+        conv_log(role, block_json);
 }
 
 void conv_add_user_text(conv_t *c, const char *utf8)

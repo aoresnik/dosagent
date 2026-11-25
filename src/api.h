@@ -32,6 +32,8 @@ void conv_add_user_text(conv_t *c, const char *utf8);
  * chat templates do with preserve_thinking off. Signed (Claude) blocks
  * are never changed. */
 void conv_drop_thinking(conv_t *c);
+/* If set, called with every block conv_append adds (session logging). */
+extern void (*conv_log)(const char *role, const char *block_json);
 
 typedef struct {
     http_target target;

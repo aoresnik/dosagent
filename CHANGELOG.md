@@ -6,6 +6,11 @@ release tags without the leading `v` (see DEVELOPMENT.md, Releases).
 
 ## [Unreleased]
 
+### Added
+- Sessions: with `session_dir` set in DOSAGENT.CFG, each conversation is
+  saved as it goes, so `DOSAGENT -r` or `/resume` can continue it after a
+  restart or a crash, along with a readable transcript.
+
 ## [0.1beta3] - 2026-11-28
 
 ### Added
