@@ -470,6 +470,23 @@ static void print_help(void)
            cfg.effort[0] ? cfg.effort : "default");
 }
 
+static void print_cmdline_help(void)
+{
+    printf("DOSAGENT %s - agentic LLM harness for DOS\n"
+           "\n"
+           "Usage: DOSAGENT [-c FILE] [REQUEST...]\n"
+           "\n"
+           "  -c FILE      read settings from FILE instead of DOSAGENT.CFG\n"
+           "  -h, --help, /?\n"
+           "               show this text and exit\n"
+           "  REQUEST      words after the options form the first request\n"
+           "\n"
+           "DOSAGENT.CFG is read from the current directory, or else from the\n"
+           "directory of DOSAGENT.EXE. ANTHROPIC_API_KEY, if set, overrides\n"
+           "api_key. Type /help at the prompt for keys and commands.\n",
+           VERSION);
+}
+
 static void apply_model_settings(void)
 {
     acfg.model = cfg.model;
@@ -494,7 +511,11 @@ int main(int argc, char **argv)
     for (i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-c") == 0 && i + 1 < argc)
             snprintf(cfg_path, sizeof cfg_path, "%s", argv[++i]);
-        else
+        else if (strcmp(argv[i], "--help") == 0 ||
+                 strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "/?") == 0) {
+            print_cmdline_help();
+            return 0;
+        } else
             break;
     }
     if (cfg_path[0]) {

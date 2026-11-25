@@ -6,6 +6,9 @@ release tags without the leading `v` (see DEVELOPMENT.md, Releases).
 
 ## [Unreleased]
 
+### Added
+- `DOSAGENT --help` (also `-h` and `/?`) prints command-line usage.
+
 ## [0.1beta] - 2026-11-24
 
 ### Changed

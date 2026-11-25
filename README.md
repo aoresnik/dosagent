@@ -151,7 +151,8 @@ again on `/clear`.
 ## Using
 
 Run `DOSAGENT`. You can also give the first request on the command line:
-`DOSAGENT what is in AUTOEXEC.BAT?`
+`DOSAGENT what is in AUTOEXEC.BAT?` `DOSAGENT --help` (or `/?`) lists the
+command-line options.
 
 Keys and commands:
 
