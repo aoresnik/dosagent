@@ -33,6 +33,11 @@ static int loading;     /* replaying a file: don't log the blocks again */
 
 /* What the header of the next new session records. */
 static buf_t sys_saved;
+/* The title is the header's first field, padded to a fixed size, so
+ * /title can rewrite it in place. */
+#define TITLE_PRE "{\"title\":\""
+#define TITLE_FIELD 200
+static char title[TITLE_FIELD + 1];
 static char model_saved[64];
 static char server_saved[256];
 
@@ -109,9 +114,95 @@ static void name_from(const char *path)
     name[i] = 0;
 }
 
+/* Appends as much of t, JSON-escaped, as fits in TITLE_FIELD bytes,
+ * padded with spaces. Returns how many bytes of t it used (whole
+ * characters only). */
+static size_t encode_title(buf_t *out, const char *t)
+{
+    size_t i = 0, end = out->len + TITLE_FIELD;
+    buf_t one;
+    buf_init(&one);
+    while (t[i]) {
+        size_t k = 1;
+        while ((t[i + k] & 0xc0) == 0x80)
+            k++;
+        buf_clear(&one);
+        json_put_str(&one, t + i, k);
+        if (out->len + one.len - 2 > end)
+            break;
+        buf_append(out, one.p + 1, one.len - 2);
+        i += k;
+    }
+    while (out->len < end)
+        buf_putc(out, ' ');
+    buf_free(&one);
+    return i;
+}
+
+static int rewrite_title(void)
+{
+    char head[sizeof TITLE_PRE];
+    buf_t field;
+    FILE *f;
+    int ok;
+
+    fflush(ses);
+    if ((f = fopen(ses_path, "r+b")) == NULL)
+        return -1;
+    ok = fread(head, 1, sizeof head - 1, f) == sizeof head - 1 &&
+         memcmp(head, TITLE_PRE, sizeof head - 1) == 0;
+    if (ok) {
+        buf_init(&field);
+        encode_title(&field, title);
+        fseek(f, (long)(sizeof TITLE_PRE - 1), SEEK_SET);
+        ok = fwrite(field.p, 1, field.len, f) == field.len;
+        buf_free(&field);
+        sync_file(f);
+    }
+    fclose(f);
+    return ok ? 0 : -1;
+}
+
+int session_set_title(const char *utf8)
+{
+    size_t n = 0, used;
+    buf_t tmp;
+
+    /* One line: runs of white space become one space. */
+    while (*utf8 == ' ' || *utf8 == '\t' || *utf8 == '\n' || *utf8 == '\r')
+        utf8++;
+    for (; *utf8 && n < sizeof title - 1; utf8++) {
+        int ws = *utf8 == ' ' || *utf8 == '\t' || *utf8 == '\n' ||
+                 *utf8 == '\r';
+        if (ws && (n == 0 || title[n - 1] == ' '))
+            continue;
+        title[n++] = ws ? ' ' : *utf8;
+    }
+    while (n > 0 && title[n - 1] == ' ')
+        n--;
+    title[n] = 0;
+    buf_init(&tmp);
+    used = encode_title(&tmp, title);
+    title[used] = 0;
+    buf_free(&tmp);
+    return ses ? rewrite_title() : 0;
+}
+
+void session_default_title(const char *utf8)
+{
+    if (!ses && !title[0])
+        session_set_title(utf8);
+}
+
+const char *session_title(void)
+{
+    return title;
+}
+
 void session_new(const char *system, const char *model, const char *server)
 {
     session_close();
+    title[0] = 0;
     buf_clear(&sys_saved);
     buf_puts(&sys_saved, system);
     snprintf(model_saved, sizeof model_saved, "%s", model);
@@ -124,7 +215,9 @@ static void write_header(void)
     char stamp[24];
     tr_stamp(stamp, sizeof stamp);
     buf_init(&b);
-    buf_puts(&b, "{\"dosagent\":\"" VERSION "\",\"started\":");
+    buf_puts(&b, TITLE_PRE);
+    encode_title(&b, title);
+    buf_puts(&b, "\",\"dosagent\":\"" VERSION "\",\"started\":");
     json_put_cstr(&b, stamp);
     buf_puts(&b, ",\"model\":");
     json_put_cstr(&b, model_saved);
@@ -262,28 +355,147 @@ static int is_session_file(const char *f)
     return strcasecmp(f + 8, ".SES") == 0;
 }
 
+typedef struct {
+    char file[16];
+    time_t mtime;
+    long size;
+    char title[TITLE_FIELD + 1];
+} entry_t;
+
+/* Newest first, by last write. */
+static int entry_cmp(const void *a, const void *b)
+{
+    const entry_t *x = a, *y = b;
+    if (x->mtime != y->mtime)
+        return x->mtime < y->mtime ? 1 : -1;
+    return strcmp(y->file, x->file);
+}
+
+/* Reads the title from the start of a .SES file, without loading it. */
+static void read_title(const char *path, char *out, size_t n)
+{
+    char head[sizeof TITLE_PRE + TITLE_FIELD + 1], err[64];
+    size_t len, i;
+    FILE *f = fopen(path, "rb");
+    jval *v;
+
+    out[0] = 0;
+    if (!f)
+        return;
+    len = fread(head, 1, sizeof head, f);
+    fclose(f);
+    if (len < sizeof TITLE_PRE || memcmp(head, TITLE_PRE, sizeof TITLE_PRE - 1))
+        return;
+    /* The string starts at the opening quote; find its end. */
+    for (i = sizeof TITLE_PRE - 1; i < len && head[i] != '"'; i++)
+        if (head[i] == '\\')
+            i++;
+    if (i >= len)
+        return;
+    v = json_parse(head + sizeof TITLE_PRE - 2, i - (sizeof TITLE_PRE - 2) + 1,
+                   err, sizeof err);
+    if (v && v->t == J_STR) {
+        snprintf(out, n, "%s", v->s);
+        for (i = strlen(out); i > 0 && out[i - 1] == ' '; i--)
+            out[i - 1] = 0;
+    }
+    json_free(v);
+}
+
+/* Lists the sessions, newest first, and asks which one to resume. */
+static int pick(char *path, size_t n)
+{
+    entry_t *list = NULL;
+    size_t count = 0, cap = 0, i, shown;
+    struct dirent *e;
+    DIR *d = opendir(dir);
+    int rows, cols, width, choice;
+    char line[16];
+
+    while (d && (e = readdir(d)) != NULL) {
+        struct stat st;
+        char full[PATH_MAX];
+        if (!is_session_file(e->d_name))
+            continue;
+        join(full, sizeof full, e->d_name);
+        if (stat(full, &st) != 0)
+            continue;
+        if (count == cap) {
+            cap = cap ? cap * 2 : 32;
+            list = xrealloc(list, cap * sizeof *list);
+        }
+        snprintf(list[count].file, sizeof list[count].file, "%.15s", e->d_name);
+        list[count].mtime = st.st_mtime;
+        list[count].size = (long)st.st_size;
+        read_title(full, list[count].title, sizeof list[count].title);
+        count++;
+    }
+    if (d)
+        closedir(d);
+    if (!count) {
+        printf("No sessions in %s.\n", dir);
+        return -1;
+    }
+    qsort(list, count, sizeof *list, entry_cmp);
+
+    plat_screen_size(&rows, &cols);
+    shown = rows > 10 ? (size_t)rows - 5 : 5;
+    if (shown > count)
+        shown = count;
+    width = cols - 36;  /* a full last column would wrap */
+    printf("  #  Name      Last used    Size  Title\n");
+    for (i = 0; i < shown; i++) {
+        char when[16], size[24];
+        buf_t t;
+        long k = (list[i].size + 1023) / 1024;
+        strftime(when, sizeof when, "%m-%d %H:%M", localtime(&list[i].mtime));
+        if (k < 1000)
+            snprintf(size, sizeof size, "%ldK", k);
+        else
+            snprintf(size, sizeof size, "%ldM", (k + 1023) / 1024);
+        buf_init(&t);
+        if (list[i].title[0])
+            utf8_to_local(&t, list[i].title, strlen(list[i].title));
+        else
+            buf_puts(&t, "(no title)");
+        if (t.len > (size_t)width && width > 3) {
+            t.len = width - 3;
+            buf_puts(&t, "...");
+        }
+        printf("%3lu  %.8s  %s  %5s  %s\n", (unsigned long)i + 1,
+               list[i].file, when, size, t.p);
+        buf_free(&t);
+    }
+    if (shown < count)
+        printf("(%lu older sessions not listed; resume them by name.)\n",
+               (unsigned long)(count - shown));
+    printf("Resume which? [1-%lu, Enter = 1, anything else cancels] ",
+           (unsigned long)shown);
+    fflush(stdout);
+    if (plat_read_line(line, sizeof line) < 0)
+        line[0] = 'x', line[1] = 0;
+#if PLAT_DOS
+    printf("\n");
+#endif
+    choice = line[0] ? atoi(line) : 1;
+    if (choice < 1 || (size_t)choice > shown) {
+        free(list);
+        printf("Cancelled.\n");
+        return -1;
+    }
+    join(path, n, list[choice - 1].file);
+    free(list);
+    return 0;
+}
+
 int session_find(const char *want, char *path, size_t n)
 {
     if (!enabled) {
         printf("Sessions are off; set session_dir in DOSAGENT.CFG.\n");
         return -1;
     }
-    if (!want[0]) {
-        char best[PATH_MAX] = "";
-        struct dirent *e;
-        DIR *d = opendir(dir);
-        while (d && (e = readdir(d)) != NULL)
-            if (is_session_file(e->d_name) && strcmp(e->d_name, best) > 0)
-                snprintf(best, sizeof best, "%s", e->d_name);
-        if (d)
-            closedir(d);
-        if (!best[0]) {
-            printf("No sessions in %s.\n", dir);
-            return -1;
-        }
-        join(path, n, best);
-        return 0;
-    }
+    if (!want[0])
+        return pick(path, n);
     if (strpbrk(want, "\\/:"))
         snprintf(path, n, "%s", want);
     else
@@ -346,6 +558,11 @@ static int load_line(char *s, size_t len, conv_t *conv, buf_t *system,
     if (json_get(v, "system")) {
         jval *sp = json_get(v, "system");
         const char *m = json_get_str(v, "model"), *sv = json_get_str(v, "server");
+        const char *t = json_get_str(v, "title");
+        size_t k;
+        snprintf(title, sizeof title, "%s", t ? t : "");
+        for (k = strlen(title); k > 0 && title[k - 1] == ' '; k--)
+            title[k - 1] = 0;
         if (sp->t == J_STR)
             buf_append(system, sp->s, sp->n);
         snprintf(model, model_n, "%s", m ? m : "");
@@ -515,8 +732,15 @@ int session_load(const char *path, conv_t *conv, buf_t *system,
     snprintf(model_saved, sizeof model_saved, "%s", model);
     snprintf(server_saved, sizeof server_saved, "%s", server);
 
-    printf("Resumed session %s (%lu messages). Its transcript ends:\n\n",
-           name[0] ? name : "?", (unsigned long)conv->n);
+    {
+        buf_t t;
+        buf_init(&t);
+        utf8_to_local(&t, title, strlen(title));
+        printf("Resumed session %s%s%s (%lu messages). Its transcript "
+               "ends:\n\n", name[0] ? name : "?", t.len ? ": " : "",
+               t.len ? t.p : "", (unsigned long)conv->n);
+        buf_free(&t);
+    }
     show_tail(15);
     printf("\n");
     tr_stamp(stamp, sizeof stamp);

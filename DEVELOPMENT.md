@@ -175,9 +175,9 @@ too. For scripted runs, use `run.sh -headless` with `qemuctl.py`
 **Sessions**
 - With `session_dir` set, every block `conv_append` adds is also written
   to a `.SES` file as one JSON line, `{"role":"user","block":{...}}`, with
-  the block kept byte for byte. The first line holds the version, start
-  time, model, server and system prompt; `{"model":...}` lines record
-  `/model` switches. A resume replays the lines, so thinking signatures
+  the block kept byte for byte. The first line holds the title, version,
+  start time, model, server and system prompt; `{"model":...}` lines
+  record `/model` switches. A resume replays the lines, so thinking signatures
   and tool_use ids stay valid and the prompt cache still matches.
 - Each line is committed with `fsync`, since a DOS crash loses whatever is
   still buffered. A cut-off last line is skipped on load. A tool call
@@ -188,6 +188,11 @@ too. For scripted runs, use `run.sh -headless` with `qemuctl.py`
   shown), each tool call with the full result the model got, and the
   usage lines. Text that was streamed but then discarded (an interrupted
   reply) is not in either file.
+- The title comes first in the header, as a JSON string padded with
+  spaces to 200 bytes. `/title` rewrites it in place, and the session
+  list reads only the start of each file, plus the directory entry's
+  time and size. `auto_title` sends a separate quiet request (no tools,
+  no thinking, not logged) with just the first prompt.
 - A resumed session uses its saved system prompt, so `AGENTS.TXT` is read
   again only on `/clear`, as within one run.
 

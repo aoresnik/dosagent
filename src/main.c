@@ -41,6 +41,7 @@ typedef struct {
     char temp_dir[PATH_MAX];
     char seed_file[PATH_MAX];
     char session_dir[PATH_MAX];
+    int auto_title;
 } config_t;
 
 static config_t cfg;
@@ -102,6 +103,7 @@ static void config_set(const char *key, const char *val)
     else if (strcmp(key, "temp_dir") == 0) SETSTR(temp_dir);
     else if (strcmp(key, "seed_file") == 0) SETSTR(seed_file);
     else if (strcmp(key, "session_dir") == 0) SETSTR(session_dir);
+    else if (strcmp(key, "auto_title") == 0) cfg.auto_title = atoi(val);
     else if (strcmp(key, "charset") == 0) charset_cp437 = strcmp(val, "cp437") == 0;
     else fprintf(stderr, "warning: unknown config key '%s'\n", key);
 }
@@ -522,7 +524,8 @@ static void print_help(void)
            "Commands:\n"
            "  /help            this text\n"
            "  /clear           start a new conversation, re-read AGENTS.TXT\n"
-           "  /resume [NAME]   continue the last (or a named) session\n"
+           "  /resume [NAME]   continue a session: pick from a list, or by name\n"
+           "  /title [TEXT]    show or set this session's title\n"
            "  /confirm         toggle approval prompts (now %s)\n"
            "  /model NAME      switch model (now %s)\n"
            "  /effort LEVEL    low, medium, high, xhigh, max (now %s)\n"
@@ -605,6 +608,65 @@ static int resume_session(const char *want, conv_t *conv, buf_t *sp)
     return 0;
 }
 
+/* Asks the model for a short title for a new session (auto_title=1).
+ * Quiet, and the first prompt stays the title if anything goes wrong. */
+static void auto_title(const char *first_utf8)
+{
+    api_cfg t = acfg;
+    conv_t c;
+    api_result r;
+    void (*saved_log)(const char *, const char *) = conv_log;
+    size_t i;
+
+    t.quiet = 1;
+    t.thinking = 0;
+    t.show_thinking = 0;
+    t.effort = "low";
+    t.max_tokens = 200;
+    t.cache = 0;
+    conv_log = NULL;    /* not part of the session */
+    conv_init(&c);
+    conv_add_user_text(&c, first_utf8);
+    conv_log = saved_log;
+    memset(&r, 0, sizeof r);
+    if (api_send(&t, "Reply with only a short title, at most eight words, for "
+                 "a conversation that starts with the request below. No "
+                 "quotes, no final period.", NULL, &c, &r) == API_OK) {
+        for (i = 0; i < r.n; i++) {
+            char err[64], *p, *e;
+            jval *v;
+            if (strcmp(r.b[i].type, "text") != 0)
+                continue;
+            v = json_parse(r.b[i].json, strlen(r.b[i].json), err, sizeof err);
+            p = (char *)json_get_str(v, "text");
+            /* First non-empty line, without quotes or a final period. */
+            while (p && (*p == '\n' || *p == ' ' || *p == '"' || *p == '*'))
+                p++;
+            if (p && *p) {
+                e = strchr(p, '\n');
+                if (e)
+                    *e = 0;
+                e = p + strlen(p);
+                while (e > p && strchr(" .\"*", e[-1]))
+                    *--e = 0;
+            }
+            if (p && *p) {
+                buf_t loc;
+                session_set_title(p);
+                buf_init(&loc);
+                utf8_to_local(&loc, session_title(), strlen(session_title()));
+                printf("[Title: %s]\n", loc.p);
+                tr_printf("[Title: %s]\n", loc.p);
+                buf_free(&loc);
+                i = r.n - 1;
+            }
+            json_free(v);
+        }
+    }
+    api_result_free(&r);
+    conv_free(&c);
+}
+
 /* Joins the input lines into the transcript, as typed. */
 static void tr_prompt(const char *s)
 {
@@ -631,6 +693,7 @@ int main(int argc, char **argv)
     const char *env;
     int i, first_prompt_from_args = 0;
     const char *resume = NULL;
+    char *title_from = NULL;    /* first prompt, for auto_title */
     buf_t sp;
     long days;
 
@@ -782,6 +845,29 @@ int main(int argc, char **argv)
                 printf("Conversation cleared.\n");
             } else if (strcmp(cmd, "/resume") == 0) {
                 resume_session(arg ? arg : "", &conv, &sp);
+            } else if (strcmp(cmd, "/title") == 0) {
+                if (!session_enabled()) {
+                    printf("Sessions are off; set session_dir in "
+                           "DOSAGENT.CFG.\n");
+                } else if (arg && *arg) {
+                    buf_t t;
+                    buf_init(&t);
+                    local_to_utf8(&t, arg, strlen(arg));
+                    if (session_set_title(t.p) < 0)
+                        printf("warning: could not update the session "
+                               "file.\n");
+                    buf_free(&t);
+                    free(title_from);
+                    title_from = NULL;
+                } else if (session_title()[0]) {
+                    buf_t t;
+                    buf_init(&t);
+                    utf8_to_local(&t, session_title(), strlen(session_title()));
+                    printf("Title: %s\n", t.p);
+                    buf_free(&t);
+                } else {
+                    printf("No title yet; the first request becomes it.\n");
+                }
             } else if (strcmp(cmd, "/confirm") == 0) {
                 cfg.confirm = !cfg.confirm;
                 printf("Approval prompts %s.\n", cfg.confirm ? "on" : "off");
@@ -799,21 +885,34 @@ int main(int argc, char **argv)
             continue;
         }
 
-        session_open();
-        tr_prompt(input.p);
         buf_init(&utf8);
         local_to_utf8(&utf8, input.p, input.len);
         if (!cfg.keep_thinking)
             conv_drop_thinking(&conv);
+        if (session_enabled() && !session_name()[0]) {
+            /* First prompt of a new session. */
+            if (cfg.auto_title && !session_title()[0])
+                title_from = xstrdup(utf8.p);
+            session_default_title(utf8.p);
+        }
+        session_open();
+        tr_prompt(input.p);
         conv_add_user_text(&conv, utf8.p);
         buf_free(&utf8);
         agent_turn(&conv);
+        if (title_from) {
+            if (session_name()[0])
+                auto_title(title_from);
+            free(title_from);
+            title_from = NULL;
+        }
     }
 quit:
     if (session_name()[0])
         printf("Session saved as %s; DOSAGENT -r continues it.\n",
                session_name());
     session_close();
+    free(title_from);
     http_disconnect();
     tls_save_seed(cfg.seed_file);
     conv_free(&conv);

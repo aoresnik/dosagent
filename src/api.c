@@ -153,7 +153,7 @@ typedef struct {
 
 static void con_print(stream_t *st, const char *s, size_t n)
 {
-    if (n == 0)
+    if (n == 0 || st->cfg->quiet)
         return;
     print_utf8(s, n);
     st->at_line_start = s[n - 1] == '\n';
@@ -161,7 +161,7 @@ static void con_print(stream_t *st, const char *s, size_t n)
 
 static void con_newline(stream_t *st)
 {
-    if (!st->at_line_start) {
+    if (!st->at_line_start && !st->cfg->quiet) {
         putchar('\n');
         st->at_line_start = 1;
     }
@@ -293,8 +293,9 @@ static void block_started(stream_t *st, const char *btype, jval *cb)
         const char *from = json_get_str(json_get(cb, "from"), "model");
         const char *to = json_get_str(json_get(cb, "to"), "model");
         con_newline(st);
-        printf("[%s declined; continuing on %s]\n",
-               from ? from : "model", to ? to : "fallback model");
+        if (!st->cfg->quiet)
+            printf("[%s declined; continuing on %s]\n",
+                   from ? from : "model", to ? to : "fallback model");
     }
 }
 
@@ -314,7 +315,8 @@ static void on_event(stream_t *st, const char *data, size_t n)
 
     if (!ev) {
         con_newline(st);
-        printf("[bad stream event: %s]\n", err);
+        if (!st->cfg->quiet)
+            printf("[bad stream event: %s]\n", err);
         return;
     }
     type = json_get_str(ev, "type");
@@ -555,8 +557,10 @@ static void build_body(buf_t *b, const api_cfg *cfg, const char *system,
         buf_puts(b, ",\"cache_control\":{\"type\":\"ephemeral\"}");
     buf_puts(b, ",\"system\":");
     json_put_cstr(b, system);
-    buf_puts(b, ",\"tools\":");
-    buf_puts(b, tools_json);
+    if (tools_json) {
+        buf_puts(b, ",\"tools\":");
+        buf_puts(b, tools_json);
+    }
     buf_puts(b, ",\"messages\":[");
     for (i = 0; i < conv->n; i++) {
         if (i)
@@ -628,7 +632,7 @@ int api_send(const api_cfg *cfg, const char *system, const char *tools_json,
         st.res = out;
         st.at_line_start = 1;
         api_result_free(out);
-        if (!cfg->stream) {
+        if (!cfg->stream && !cfg->quiet) {
             printf("[waiting for reply...]\n");
             fflush(stdout);
         }
@@ -646,7 +650,8 @@ int api_send(const api_cfg *cfg, const char *system, const char *tools_json,
         con_newline(&st);
 
         if (status == HTTP_ERR_ABORT) {
-            printf("[interrupted]\n");
+            if (!cfg->quiet)
+                printf("[interrupted]\n");
             buf_free(&st.error_msg);
             rc = API_ABORTED;
             break;
@@ -658,7 +663,11 @@ int api_send(const api_cfg *cfg, const char *system, const char *tools_json,
             break;
         }
 
-        if (status >= 200 && status < 300) {
+        if (cfg->quiet) {
+            /* A side request: no messages, no retries. */
+            buf_free(&st.error_msg);
+            break;
+        } else if (status >= 200 && status < 300) {
             if (st.stream_error) {
                 printf("Stream error (%s): ", st.error_type);
                 print_utf8(st.error_msg.p, st.error_msg.len);

@@ -178,11 +178,25 @@ conversation as it goes, in two files named after the date, such as
   `MORE`: your prompts with the time, the replies, each command or file
   change with its full output, and token use.
 
-`DOSAGENT -r` continues the latest session, `DOSAGENT -r 26112501` a
-particular one, and `/resume` does the same from the prompt. It shows the
-end of the transcript so you can see where you left off. A command that
-was running when the machine crashed is reported to the model as not
-finished. `/clear` starts a new session.
+Each session has a title: your first request, unless you change it with
+`/title TEXT`. With `auto_title=1`, the model writes a short title after
+its first reply instead (one extra small request).
+
+`DOSAGENT -r` (or `/resume` at the prompt) lists the sessions, the most
+recently used first, and asks which one to continue; Enter picks the top
+one:
+
+```
+  #  Name      Last used    Size  Title
+  1  26112603  11-26 14:03    12K  Turbo Pascal word count
+  2  26112501  11-25 22:40     3K  Install the ANSI driver in C:\PKG\NANSI.ZIP
+```
+
+`DOSAGENT -r 26112501` or `/resume 26112501` continues a session by name.
+DOSAGENT shows the end of the transcript, so you can see where you left
+off. A command that was running when the machine crashed is reported to
+the model as not finished. `/clear` starts a new session. To clean up,
+delete old files with `DEL`.
 
 ## Using
 
@@ -199,8 +213,8 @@ Keys and commands:
   continue the prompt on the next line.
 - At an approval prompt: Y = yes, N = no (you can type a reason), A = stop
   asking.
-- Commands: `/help`, `/clear`, `/resume [NAME]`, `/confirm`,
-  `/model NAME`, `/effort LEVEL`, `/quit`.
+- Commands: `/help`, `/clear`, `/resume [NAME]`, `/title [TEXT]`,
+  `/confirm`, `/model NAME`, `/effort LEVEL`, `/quit`.
 
 Things to know:
 

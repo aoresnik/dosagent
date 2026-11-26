@@ -404,6 +404,12 @@ int plat_read_screen(buf_t *out)
     return 1;
 }
 
+void plat_screen_size(int *rows, int *cols)
+{
+    *rows = ScreenRows();
+    *cols = ScreenCols();
+}
+
 void plat_sleep_ms(unsigned ms)
 {
     delay(ms);
@@ -478,6 +484,12 @@ int plat_read_screen(buf_t *out)
 {
     (void)out;
     return 0;
+}
+
+void plat_screen_size(int *rows, int *cols)
+{
+    *rows = 25;
+    *cols = 80;
 }
 
 void plat_sleep_ms(unsigned ms)

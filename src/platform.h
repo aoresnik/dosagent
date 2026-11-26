@@ -32,6 +32,8 @@ int plat_getkey(void);
 /* Append the text-mode screen contents (CP437 bytes, one line per row,
  * trailing blanks trimmed). Returns 0 if unsupported. */
 int plat_read_screen(buf_t *out);
+/* Text screen size (80x25 on the host). */
+void plat_screen_size(int *rows, int *cols);
 void plat_sleep_ms(unsigned ms);
 /* Current directory as the user would write it (C:\WORK on DOS). */
 char *plat_getcwd(char *out, size_t n);

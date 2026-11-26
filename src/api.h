@@ -47,6 +47,7 @@ typedef struct {
     int fallbacks;          /* server-side refusal fallbacks */
     int cache;              /* automatic prompt caching */
     int stream;             /* 0 = whole reply at once (fewer packets) */
+    int quiet;              /* print nothing, don't retry (side requests) */
 } api_cfg;
 
 typedef struct {
@@ -72,9 +73,10 @@ void api_result_free(api_result *r);
 #define API_ABORTED (-2)
 
 /* Sends the conversation and prints the reply to the console as it streams
- * in (or all at once if cfg->stream is 0). On API_OK
- * the result holds the assistant's content blocks, already filtered as the
- * API requires for echoing back (see fallback handling in api.c). */
+ * in (or all at once if cfg->stream is 0; tools_json NULL = no tools).
+ * On API_OK the result holds the assistant's content blocks, already
+ * filtered as the API requires for echoing back (see fallback handling in
+ * api.c). */
 int api_send(const api_cfg *cfg, const char *system, const char *tools_json,
              const conv_t *conv, api_result *out);
 

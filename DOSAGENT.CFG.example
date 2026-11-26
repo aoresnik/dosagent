@@ -64,3 +64,7 @@ seed_file=RANDSEED.BIN
 # DOSAGENT -r can resume (YYMMDDnn.SES) and a readable transcript
 # (YYMMDDnn.TXT). A relative path is next to DOSAGENT.EXE. Empty = off.
 session_dir=
+
+# Let the model title each new session after its first reply (1/0).
+# Otherwise the first request is the title; /title changes it.
+auto_title=0
