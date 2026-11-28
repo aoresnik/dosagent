@@ -9,6 +9,13 @@ release tags without the leading `v` (see DEVELOPMENT.md, Releases).
 ### Added
 - `DOSAGENT --help` (also `-h` and `/?`) prints command-line usage.
 
+### Changed
+- On DOS, a command chained with `&&` or `||` is no longer run (COMMAND.COM
+  would pass the operators to the first program as arguments). The model is
+  told why and to run each command on its own or use a batch file. The
+  run_command description now states this too, since smaller models
+  overlooked it in the system prompt.
+
 ## [0.1beta] - 2026-11-24
 
 ### Changed

@@ -411,6 +411,11 @@ static void agent_turn(conv_t *conv)
             if (aborted) {
                 buf_puts(&result, "Not run: the user interrupted.");
                 is_error = 1;
+            } else if (tool_reject(b->name, b->input, &result)) {
+                printf("  ! ");
+                print_utf8(result.p, result.len > 200 ? 200 : result.len);
+                printf("\n");
+                is_error = 1;
             } else {
                 if (cfg.confirm && tool_needs_confirm(b->name))
                     allowed = confirm_tool(reason, sizeof reason);

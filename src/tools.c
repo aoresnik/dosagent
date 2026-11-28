@@ -33,7 +33,10 @@ static long max_output = 16000;
 static const char tools_common[] =
     "[{\"name\":\"run_command\",\"description\":\"" DESC_RUN
 #if PLAT_DOS
-    " Runs via COMMAND.COM. There is no timeout: never start a program that "
+    " Runs via COMMAND.COM, which has no && or ||: give one command per "
+    "call, and check its exit code before the next call. For a longer "
+    "sequence, write a batch file and run that. There is no timeout: never "
+    "start a program that "
     "waits for keyboard input or does not exit on its own. Set "
     "capture_screen for programs that write to video memory instead of "
     "stdout.\","
@@ -112,6 +115,23 @@ int tool_needs_confirm(const char *name)
 }
 
 /* ------------------------------------------------------------ helpers */
+
+#if PLAT_DOS
+/* COMMAND.COM has no && or ||; it passes them to the program as arguments,
+ * so a chained command runs only its first part, with garbage arguments. */
+static int has_chain_op(const char *cmd)
+{
+    int quoted = 0;
+    for (; *cmd; cmd++) {
+        if (*cmd == '"')
+            quoted = !quoted;
+        else if (!quoted && (cmd[0] == '&' || cmd[0] == '|') &&
+                 cmd[1] == cmd[0])
+            return 1;
+    }
+    return 0;
+}
+#endif
 
 static const char *arg_str(const jval *in, const char *key)
 {
@@ -641,6 +661,26 @@ static void put_preview(buf_t *out, const char *label, const jval *v)
             buf_puts(out, "  | ...\n");
     }
     buf_free(&loc);
+}
+
+int tool_reject(const char *name, const jval *in, buf_t *result)
+{
+#if PLAT_DOS
+    const char *cmd = in && in->t == J_OBJ ? arg_str(in, "command") : NULL;
+    if (strcmp(name, "run_command") == 0 && cmd && has_chain_op(cmd)) {
+        buf_puts(result,
+                 "Not run: COMMAND.COM has no && or ||. It would pass them "
+                 "to the first program as arguments. Run each command in "
+                 "its own run_command call and check its exit code, or "
+                 "write a batch file with write_file and run that.");
+        return 1;
+    }
+#else
+    (void)name;
+    (void)in;
+    (void)result;
+#endif
+    return 0;
 }
 
 void tool_describe(const char *name, const jval *in, buf_t *out)
