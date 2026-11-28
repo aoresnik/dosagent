@@ -105,17 +105,19 @@ $(DOS_OBJ)/CWSDPMI.DOC: $(CWSDPMI_ZIP)
 	unzip -p $< bin/cwsdpmi.doc > $@
 
 # Watt-32: the DOS objects of src/makefile.all (CORE, BSD, BIND, ZLIB and the
-# DOS-only files), minus the Windows-only ones.
+# DOS-only files), minus the Windows-only ones. idna.c and punycode.c are
+# left out (iconv and charset tables, ~200 KB); dos/watt32/noidna.c stands
+# in for them.
 WATT_SRC  := $(WATT_ROOT)/src
 WATT_C    := accept bind bsddbug bsdname btree chksum close connect crc dynip \
              echo fcntl get_ai get_ip get_ni get_xbyr geteth gethost gethost6 \
-             getname getnet getopt getprot getput getserv gettod idna ioctl \
+             getname getnet getopt getprot getput getserv gettod ioctl \
              ip4_frag ip4_in ip4_out ip6_in ip6_out language linkaddr listen \
              lookup loopback misc netaddr netback neterr nettime nsapaddr \
              oldstuff packet32 pc_cbrk pcarp pcbootp pcbuf pcconfig pcdbug \
              pcdhcp pcdns pcicmp pcicmp6 pcigmp pcping pcqueue pcrarp pcrecv \
              pcsed pcstat pctcp ports ppp pppoe presaddr printk profile \
-             punycode receive res_comp res_data res_debu res_init res_loc \
+             receive res_comp res_data res_debu res_init res_loc \
              res_mkqu res_quer res_send run select settod shutdown signal \
              sock_dbu sock_in sock_ini sock_io sock_prn sock_scn sock_sel \
              socket sockopt split stream misc_str swsvpkt syslog syslog2 \
@@ -123,7 +125,8 @@ WATT_C    := accept bind bsddbug bsdname btree chksum close connect crc dynip \
              zcompres zcrc32 zdeflate zgzio zinfback zinffast zinflate \
              zinftree ztrees zuncompr zutil \
              country fsext pcpkt32 pcpkt pcintr powerpak qmsg wdpmi x32vm
-WATT_OBJS := $(WATT_C:%=$(DOS_OBJ)/watt32/%.o) $(DOS_OBJ)/watt32/cpumodel.o
+WATT_OBJS := $(WATT_C:%=$(DOS_OBJ)/watt32/%.o) $(DOS_OBJ)/watt32/cpumodel.o \
+             $(DOS_OBJ)/watt32/noidna.o
 # -fgnu89-inline: Watt-32 relies on GNU extern-inline semantics.
 WATT_CFLAGS := -O2 $(DOS_ARCH) -fgnu89-inline -w -DWATT32_BUILD \
                -I$(WATT_SRC) -I$(WATT_ROOT)/inc -Idos/watt32 -I$(DOS_OBJ)/watt32
@@ -134,6 +137,10 @@ $(DOS_OBJ)/libwatt.a: $(WATT_OBJS)
 
 $(DOS_OBJ)/watt32/%.o: $(WATT_SRC)/%.c $(DOS_OBJ)/watt32/build/djgpp/cflags.h
 	@$(DOS_CC) $(WATT_CFLAGS) -c -o $@ $<
+
+$(DOS_OBJ)/watt32/noidna.o: dos/watt32/noidna.c
+	@mkdir -p $(dir $@)
+	$(DOS_CC) $(WATT_CFLAGS) -c -o $@ $<
 
 # The real-mode packet receiver (USE_FAST_PKT), assembled and turned into a
 # C byte array for pcpkt2.c (what Watt-32's bin2c does).

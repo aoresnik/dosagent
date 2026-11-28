@@ -11,6 +11,11 @@ release tags without the leading `v` (see DEVELOPMENT.md, Releases).
   This sends far fewer packets, which helps on PLIP or SLIP with a local
   model, but nothing is shown until the reply is complete.
 
+### Changed
+- DOSAGENT.EXE is about 200 KB smaller and needs that much less memory:
+  Watt-32's IDNA support (iconv and charset tables, for host names with
+  national characters) is no longer built in.
+
 ## [0.1beta2] - 2026-11-28
 
 ### Added
