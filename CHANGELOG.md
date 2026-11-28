@@ -6,6 +6,8 @@ release tags without the leading `v` (see DEVELOPMENT.md, Releases).
 
 ## [Unreleased]
 
+## [0.1beta3] - 2026-11-28
+
 ### Added
 - `stream=0` in DOSAGENT.CFG gets each reply whole instead of streamed.
   This sends far fewer packets, which helps on PLIP or SLIP with a local
@@ -75,7 +77,8 @@ release tags without the leading `v` (see DEVELOPMENT.md, Releases).
 - Release archive with CWSDPMI, a CA bundle, and a WATTCP.CFG set up for
   DHCP.
 
-[Unreleased]: https://github.com/aoresnik/dosagent/compare/v0.1beta2...HEAD
+[Unreleased]: https://github.com/aoresnik/dosagent/compare/v0.1beta3...HEAD
+[0.1beta3]: https://github.com/aoresnik/dosagent/compare/v0.1beta2...v0.1beta3
 [0.1beta2]: https://github.com/aoresnik/dosagent/compare/v0.1beta...v0.1beta2
 [0.1beta]: https://github.com/aoresnik/dosagent/compare/v0.1alpha3...v0.1beta
 [0.1alpha3]: https://github.com/aoresnik/dosagent/compare/v0.1alpha2...v0.1alpha3
