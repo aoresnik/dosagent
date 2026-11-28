@@ -6,6 +6,8 @@ release tags without the leading `v` (see DEVELOPMENT.md, Releases).
 
 ## [Unreleased]
 
+## [0.1beta2] - 2026-11-28
+
 ### Added
 - `DOSAGENT --help` (also `-h` and `/?`) prints command-line usage.
 
@@ -60,7 +62,8 @@ release tags without the leading `v` (see DEVELOPMENT.md, Releases).
 - Release archive with CWSDPMI, a CA bundle, and a WATTCP.CFG set up for
   DHCP.
 
-[Unreleased]: https://github.com/aoresnik/dosagent/compare/v0.1beta...HEAD
+[Unreleased]: https://github.com/aoresnik/dosagent/compare/v0.1beta2...HEAD
+[0.1beta2]: https://github.com/aoresnik/dosagent/compare/v0.1beta...v0.1beta2
 [0.1beta]: https://github.com/aoresnik/dosagent/compare/v0.1alpha3...v0.1beta
 [0.1alpha3]: https://github.com/aoresnik/dosagent/compare/v0.1alpha2...v0.1alpha3
 [0.1alpha2]: https://github.com/aoresnik/dosagent/compare/v0.1alpha...v0.1alpha2
