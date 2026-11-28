@@ -144,6 +144,11 @@ as they are. The model's chat template must support tool calls. Tested
 with Qwen3.8-27B: tool calls, command approval and multi-turn sessions
 work.
 
+llama.cpp streams every token in its own packet. Over PLIP or SLIP,
+`stream=0` is faster: the whole reply comes at once in full packets, but
+nothing is shown until it is complete. `llama-server --reasoning off`
+saves more by turning off the model's thinking, at some cost in quality.
+
 ### Notes for the agent (AGENTS.TXT)
 
 Put instructions and facts the agent should always know into a plain text

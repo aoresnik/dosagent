@@ -89,6 +89,7 @@ typedef struct {
     const api_cfg *cfg;
     buf_t line;        /* current SSE line */
     buf_t data;        /* accumulated data: field of current event */
+    buf_t whole;       /* the whole body, when not streaming */
     pending_t *pend;
     size_t npend;
     api_result *res;
@@ -227,6 +228,34 @@ static void finish_block(stream_t *st, pending_t *p)
     result_add(st->res, &b);
 }
 
+/* Console output at the start of a content block. */
+static void block_started(stream_t *st, const char *btype, jval *cb)
+{
+    if (btype && strcmp(btype, "thinking") == 0) {
+        con_newline(st);
+        con_print(st, st->cfg->show_thinking ? "[thinking] " :
+                  "[thinking...]\n", st->cfg->show_thinking ? 11 : 14);
+        st->in_thinking_print = st->cfg->show_thinking;
+    } else if (btype && strcmp(btype, "redacted_thinking") == 0) {
+        con_newline(st);
+        con_print(st, "[thinking...]\n", 14);
+    } else if (btype && strcmp(btype, "fallback") == 0) {
+        const char *from = json_get_str(json_get(cb, "from"), "model");
+        const char *to = json_get_str(json_get(cb, "to"), "model");
+        con_newline(st);
+        printf("[%s declined; continuing on %s]\n",
+               from ? from : "model", to ? to : "fallback model");
+    }
+}
+
+static void set_error(stream_t *st, const char *type, const char *msg)
+{
+    st->stream_error = 1;
+    snprintf(st->error_type, sizeof st->error_type, "%s", type);
+    buf_clear(&st->error_msg);
+    buf_puts(&st->error_msg, msg);
+}
+
 static void on_event(stream_t *st, const char *data, size_t n)
 {
     char err[96];
@@ -268,23 +297,9 @@ static void on_event(stream_t *st, const char *data, size_t n)
                 ev->child = cb->next;
             cb->next = NULL;
             p->start = cb;
-            if (btype && strcmp(btype, "text") == 0) {
+            if (btype && strcmp(btype, "text") == 0)
                 p->has_text = 1;
-            } else if (btype && strcmp(btype, "thinking") == 0) {
-                con_newline(st);
-                con_print(st, st->cfg->show_thinking ? "[thinking] " :
-                          "[thinking...]\n", st->cfg->show_thinking ? 11 : 14);
-                st->in_thinking_print = st->cfg->show_thinking;
-            } else if (btype && strcmp(btype, "redacted_thinking") == 0) {
-                con_newline(st);
-                con_print(st, "[thinking...]\n", 14);
-            } else if (btype && strcmp(btype, "fallback") == 0) {
-                const char *from = json_get_str(json_get(cb, "from"), "model");
-                const char *to = json_get_str(json_get(cb, "to"), "model");
-                con_newline(st);
-                printf("[%s declined; continuing on %s]\n",
-                       from ? from : "model", to ? to : "fallback model");
-            }
+            block_started(st, btype, cb);
         }
     } else if (strcmp(type, "content_block_delta") == 0) {
         pending_t *p = pend_at(st, json_get_long(ev, "index", -1));
@@ -336,12 +351,73 @@ static void on_event(stream_t *st, const char *data, size_t n)
         jval *e = json_get(ev, "error");
         const char *et = json_get_str(e, "type");
         const char *em = json_get_str(e, "message");
-        st->stream_error = 1;
-        snprintf(st->error_type, sizeof st->error_type, "%s", et ? et : "error");
-        buf_clear(&st->error_msg);
-        buf_puts(&st->error_msg, em ? em : "(no message)");
+        set_error(st, et ? et : "error", em ? em : "(no message)");
     }
     json_free(ev);
+}
+
+/* A non-streamed reply: one message object. Its blocks go through the same
+ * console output and serialization as streamed ones. */
+static void on_message(stream_t *st)
+{
+    char err[96];
+    jval *msg = json_parse(st->whole.p ? st->whole.p : "", st->whole.len,
+                           err, sizeof err);
+    jval *usage, *content, *cb;
+    const char *s;
+
+    if (!msg || msg->t != J_OBJ) {
+        set_error(st, "invalid_response", err);
+        json_free(msg);
+        return;
+    }
+    if ((cb = json_get(msg, "error")) != NULL) {
+        const char *et = json_get_str(cb, "type");
+        const char *em = json_get_str(cb, "message");
+        set_error(st, et ? et : "error", em ? em : "(no message)");
+        json_free(msg);
+        return;
+    }
+    if ((s = json_get_str(msg, "model")) != NULL)
+        snprintf(st->res->model, sizeof st->res->model, "%s", s);
+    if ((s = json_get_str(msg, "stop_reason")) != NULL)
+        snprintf(st->res->stop_reason, sizeof st->res->stop_reason, "%s", s);
+    usage = json_get(msg, "usage");
+    st->res->in_tok = json_get_long(usage, "input_tokens", 0);
+    st->res->out_tok = json_get_long(usage, "output_tokens", 0);
+    st->res->cache_read = json_get_long(usage, "cache_read_input_tokens", 0);
+    st->res->cache_write = json_get_long(usage, "cache_creation_input_tokens", 0);
+
+    content = json_get(msg, "content");
+    while (content && content->t == J_ARR && (cb = content->child) != NULL) {
+        pending_t p;
+        const char *btype = json_get_str(cb, "type");
+        jval *v;
+        content->child = cb->next;
+        cb->next = NULL;
+        if (cb->t != J_OBJ) {
+            json_free(cb);
+            continue;
+        }
+        block_started(st, btype, cb);
+        if (btype && strcmp(btype, "text") == 0 &&
+            (v = json_get(cb, "text")) && v->t == J_STR)
+            con_print(st, v->s, v->n);
+        else if (btype && strcmp(btype, "thinking") == 0 &&
+                 st->cfg->show_thinking && (v = json_get(cb, "thinking")) &&
+                 v->t == J_STR)
+            con_print(st, v->s, v->n);
+        if (st->in_thinking_print) {
+            con_newline(st);
+            st->in_thinking_print = 0;
+        }
+        memset(&p, 0, sizeof p);
+        p.start = cb;
+        finish_block(st, &p);
+        pend_reset(&p);
+    }
+    st->got_stop = 1;
+    json_free(msg);
 }
 
 /* SSE framing: "data:" lines accumulate until a blank line. */
@@ -349,6 +425,10 @@ static void on_body(void *ctx, const char *data, size_t n)
 {
     stream_t *st = ctx;
     size_t i;
+    if (!st->cfg->stream) {
+        buf_append(&st->whole, data, n);
+        return;
+    }
     for (i = 0; i < n; i++) {
         char ch = data[i];
         if (ch != '\n') {
@@ -406,7 +486,8 @@ static void build_body(buf_t *b, const api_cfg *cfg, const char *system,
     size_t i;
     buf_puts(b, "{\"model\":");
     json_put_cstr(b, cfg->model);
-    buf_printf(b, ",\"max_tokens\":%ld,\"stream\":true", cfg->max_tokens);
+    buf_printf(b, ",\"max_tokens\":%ld,\"stream\":%s", cfg->max_tokens,
+               cfg->stream ? "true" : "false");
     if (cfg->thinking) {
         buf_puts(b, ",\"thinking\":{\"type\":\"adaptive\"");
         if (cfg->show_thinking)
@@ -475,9 +556,11 @@ int api_send(const api_cfg *cfg, const char *system, const char *tools_json,
     buf_init(&errbody);
     build_body(&body, cfg, system, tools_json, conv);
 
-    buf_puts(&headers, "Content-Type: application/json\r\n"
-                       "Accept: text/event-stream\r\n"
-                       "User-Agent: dosagent/" VERSION "\r\n"
+    buf_puts(&headers, cfg->stream ? "Content-Type: application/json\r\n"
+                                     "Accept: text/event-stream\r\n"
+                                   : "Content-Type: application/json\r\n"
+                                     "Accept: application/json\r\n");
+    buf_puts(&headers, "User-Agent: dosagent/" VERSION "\r\n"
                        "anthropic-version: 2023-06-01\r\n");
     if (cfg->api_key && cfg->api_key[0])
         buf_printf(&headers, "x-api-key: %s\r\n", cfg->api_key);
@@ -495,6 +578,10 @@ int api_send(const api_cfg *cfg, const char *system, const char *tools_json,
         st.res = out;
         st.at_line_start = 1;
         api_result_free(out);
+        if (!cfg->stream) {
+            printf("[waiting for reply...]\n");
+            fflush(stdout);
+        }
 
         status = http_post(&cfg->target, cfg->path, headers.p, body.p, body.len,
                            on_body, &st, &errbody, &retry_after);
@@ -503,6 +590,9 @@ int api_send(const api_cfg *cfg, const char *system, const char *tools_json,
         free(st.pend);
         buf_free(&st.line);
         buf_free(&st.data);
+        if (!cfg->stream && status >= 200 && status < 300)
+            on_message(&st);
+        buf_free(&st.whole);
         con_newline(&st);
 
         if (status == HTTP_ERR_ABORT) {

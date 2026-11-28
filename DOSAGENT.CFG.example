@@ -20,6 +20,12 @@ fallbacks=1
 # saves a lot of money on long sessions.
 cache=1
 
+# Stream the reply as it is written (1), or get it whole at once (0).
+# 0 sends far fewer packets, which helps on PLIP or SLIP, but nothing is
+# shown until the reply is complete. Keep 1 for Claude: long replies can
+# time out without streaming.
+stream=1
+
 # Ask before running commands and changing files.
 confirm=1
 

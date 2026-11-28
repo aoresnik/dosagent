@@ -6,6 +6,11 @@ release tags without the leading `v` (see DEVELOPMENT.md, Releases).
 
 ## [Unreleased]
 
+### Added
+- `stream=0` in DOSAGENT.CFG gets each reply whole instead of streamed.
+  This sends far fewer packets, which helps on PLIP or SLIP with a local
+  model, but nothing is shown until the reply is complete.
+
 ## [0.1beta2] - 2026-11-28
 
 ### Added
