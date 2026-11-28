@@ -149,6 +149,11 @@ llama.cpp streams every token in its own packet. Over PLIP or SLIP,
 nothing is shown until it is complete. `llama-server --reasoning off`
 saves more by turning off the model's thinking, at some cost in quality.
 
+Every request also resends the model's reasoning from earlier prompts,
+which the server shows to the model again. `keep_thinking=0` drops it
+when you type a new prompt, so long sessions send less and use less
+memory; the reasoning for the prompt being worked on is kept.
+
 ### Notes for the agent (AGENTS.TXT)
 
 Put instructions and facts the agent should always know into a plain text

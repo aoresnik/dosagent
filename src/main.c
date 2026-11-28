@@ -33,6 +33,7 @@ typedef struct {
     int fallbacks;
     int cache;
     int stream;
+    int keep_thinking;
     int confirm;
     long max_output;
     char tls_date[16];
@@ -57,6 +58,7 @@ static void config_defaults(void)
     cfg.fallbacks = 1;
     cfg.cache = 1;
     cfg.stream = 1;
+    cfg.keep_thinking = 1;
     cfg.confirm = 1;
     cfg.max_output = 16000;
     snprintf(cfg.seed_file, sizeof cfg.seed_file, "RANDSEED.BIN");
@@ -91,6 +93,7 @@ static void config_set(const char *key, const char *val)
     else if (strcmp(key, "fallbacks") == 0) cfg.fallbacks = atoi(val);
     else if (strcmp(key, "cache") == 0) cfg.cache = atoi(val);
     else if (strcmp(key, "stream") == 0) cfg.stream = atoi(val);
+    else if (strcmp(key, "keep_thinking") == 0) cfg.keep_thinking = atoi(val);
     else if (strcmp(key, "confirm") == 0) cfg.confirm = atoi(val);
     else if (strcmp(key, "max_output") == 0) cfg.max_output = atol(val);
     else if (strcmp(key, "tls_date") == 0) SETSTR(tls_date);
@@ -656,6 +659,8 @@ int main(int argc, char **argv)
 
         buf_init(&utf8);
         local_to_utf8(&utf8, input.p, input.len);
+        if (!cfg.keep_thinking)
+            conv_drop_thinking(&conv);
         conv_add_user_text(&conv, utf8.p);
         buf_free(&utf8);
         agent_turn(&conv);

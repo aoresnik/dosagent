@@ -26,6 +26,13 @@ cache=1
 # time out without streaming.
 stream=1
 
+# Local models only: keep the model's reasoning from earlier prompts (1),
+# or drop it when you type a new prompt (0). The server shows the model
+# all earlier reasoning by default; 0 makes each request smaller and saves
+# memory in long sessions, and the model still sees the reasoning of the
+# prompt it is working on. Claude's thinking is always kept.
+keep_thinking=1
+
 # Ask before running commands and changing files.
 confirm=1
 

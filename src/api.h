@@ -18,6 +18,7 @@ typedef struct {
 typedef struct {
     msg_t *m;
     size_t n, cap;
+    size_t thin_from;   /* conv_drop_thinking has done messages before this */
 } conv_t;
 
 void conv_init(conv_t *c);
@@ -25,6 +26,12 @@ void conv_free(conv_t *c);
 /* Appends to the last message if it has the same role, else starts one. */
 void conv_append(conv_t *c, const char *role, const char *block_json);
 void conv_add_user_text(conv_t *c, const char *utf8);
+/* Empties the text of thinking blocks without a signature (local servers
+ * send those) in the messages so far. Called before a new prompt, it
+ * leaves the model only the current turn's reasoning, as llama.cpp's
+ * chat templates do with preserve_thinking off. Signed (Claude) blocks
+ * are never changed. */
+void conv_drop_thinking(conv_t *c);
 
 typedef struct {
     http_target target;

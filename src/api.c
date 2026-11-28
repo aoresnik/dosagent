@@ -53,6 +53,52 @@ void conv_add_user_text(conv_t *c, const char *utf8)
     buf_free(&b);
 }
 
+/* Rewrites one message if it holds unsigned thinking with text in it. */
+static void drop_thinking_msg(msg_t *m)
+{
+    buf_t arr;
+    jval *root, *b;
+    char err[96];
+    int found = 0;
+
+    buf_init(&arr);
+    buf_putc(&arr, '[');
+    buf_append(&arr, m->content.p, m->content.len);
+    buf_putc(&arr, ']');
+    root = json_parse(arr.p, arr.len, err, sizeof err);
+    buf_free(&arr);
+    if (!root)
+        return;
+    for (b = root->child; b; b = b->next) {
+        const char *type = json_get_str(b, "type");
+        const char *sig = json_get_str(b, "signature");
+        jval *t = json_get(b, "thinking");
+        if (type && strcmp(type, "thinking") == 0 && (!sig || !*sig) &&
+            t && t->t == J_STR && t->n > 0) {
+            t->s[0] = 0;
+            t->n = 0;
+            found = 1;
+        }
+    }
+    if (found) {
+        buf_free(&m->content);
+        buf_init(&m->content);
+        for (b = root->child; b; b = b->next) {
+            if (b != root->child)
+                buf_putc(&m->content, ',');
+            json_write(&m->content, b);
+        }
+    }
+    json_free(root);
+}
+
+void conv_drop_thinking(conv_t *c)
+{
+    for (; c->thin_from < c->n; c->thin_from++)
+        if (strcmp(c->m[c->thin_from].role, "assistant") == 0)
+            drop_thinking_msg(&c->m[c->thin_from]);
+}
+
 /* ------------------------------------------------------------ result */
 
 void api_result_free(api_result *r)

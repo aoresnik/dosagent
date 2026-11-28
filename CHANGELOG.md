@@ -10,6 +10,9 @@ release tags without the leading `v` (see DEVELOPMENT.md, Releases).
 - `stream=0` in DOSAGENT.CFG gets each reply whole instead of streamed.
   This sends far fewer packets, which helps on PLIP or SLIP with a local
   model, but nothing is shown until the reply is complete.
+- `keep_thinking=0` in DOSAGENT.CFG drops a local model's reasoning from
+  earlier prompts when a new prompt is typed, so long sessions send less
+  over the network and use less memory. Claude's thinking is always kept.
 
 ### Changed
 - DOSAGENT.EXE is about 200 KB smaller and needs that much less memory:
