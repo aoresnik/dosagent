@@ -541,7 +541,7 @@ static void print_cmdline_help(void)
            "Usage: DOSAGENT [-c FILE] [-r [NAME]] [REQUEST...]\n"
            "\n"
            "  -c FILE      read settings from FILE instead of DOSAGENT.CFG\n"
-           "  -r [NAME]    resume the latest session, or session NAME\n"
+           "  -r [NAME]    pick a session to resume from a list, or resume NAME\n"
            "               (needs session_dir in DOSAGENT.CFG)\n"
            "  -h, --help, /?\n"
            "               show this text and exit\n"
