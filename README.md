@@ -13,7 +13,8 @@ leaves almost all conventional memory free for the programs it runs.
 Tested on a real 386 with 4 MB RAM and MS-DOS 5.0, connected through
 EtherSLIP over a serial cable to slirp on a Linux machine, using a
 llama.cpp server without TLS: the first reply to a short prompt took about
-10 seconds. Also tested in QEMU with FreeDOS 1.4.
+10 seconds. Also tested on the same machine over PLIP (a parallel cable),
+which is much more comfortable, and in QEMU with FreeDOS 1.4.
 
 ![DOSAGENT on MS-DOS 5.0 answering "What kind of machine are you running
 on?" using a local model](docs/dosagent.png)
@@ -86,9 +87,15 @@ contains:
 
 You also need a packet driver for your network card, loaded before
 DOSAGENT runs, for example `NE2000 0x60 <irq> <io>` in `AUTOEXEC.BAT`.
-Without a network card, a serial cable works too: run the EtherSLIP packet
-driver on the DOS machine and slirp on the other end. Tested with the
-updated EtherSLIP from https://github.com/mbbrutman/EtherSLIP; the
+Ethernet is recommended: every request resends the whole conversation, so
+a slow link makes each turn wait.
+
+Without a network card, a parallel or serial cable to another machine
+works too. PLIP over a parallel cable is the better choice. SLIP over a
+serial port is slow: even at 115200 baud it moves about 11 KB a second,
+so long conversations take a while to send. For SLIP, run the EtherSLIP
+packet driver on the DOS machine and slirp on the other end. Tested with
+the updated EtherSLIP from https://github.com/mbbrutman/EtherSLIP; the
 original Crynwr version has not been tried.
 
 If your network has no DHCP server, put a static address in `WATTCP.CFG`.

@@ -15,6 +15,8 @@ release tags without the leading `v` (see DEVELOPMENT.md, Releases).
   told why and to run each command on its own or use a batch file. The
   run_command description now states this too, since smaller models
   overlooked it in the system prompt.
+- README.md recommends Ethernet, or PLIP over a parallel cable, and notes
+  that SLIP over a serial port is slow.
 
 ## [0.1beta] - 2026-11-24
 
